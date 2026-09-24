@@ -1,622 +1,221 @@
 <!DOCTYPE html>
-<html lang="zh-TW" class="dark">
+<html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>台灣國道服務區與休息站即時里程指南</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts Inter & Noto Sans TC -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        freeway: {
-                            green: '#00875A',
-                            darkgreen: '#005c3d',
-                            blue: '#0055A5',
-                            signBg: '#0f291e',
-                            shieldGreen: '#00875A'
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['"Noto Sans TC"', 'Inter', 'sans-serif'],
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        /* Custom styled scrollbars */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.1);
-        }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(0, 135, 90, 0.5);
-            border-radius: 4px;
-        }
-        /* Touch safety for big buttons */
-        .btn-touch {
-            touch-action: manipulation;
-            user-select: none;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <!-- 針對手機最佳化，防止使用者縮放影響駕駛操作 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>國道休息站即時看板</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      touch-action: manipulation; /* 優化手機觸控反應 */
+    }
+  </style>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen font-sans antialiased selection:bg-emerald-500 selection:text-white pb-12">
+<body class="min-h-screen flex flex-col pb-10">
 
-    <!-- Header / Navbar -->
-    <header class="bg-emerald-900/90 border-b border-emerald-700/50 sticky top-0 z-50 backdrop-blur-md shadow-lg">
-        <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center font-black text-white text-xl border-2 border-white/80 shadow">
-                    <i class="fa-solid fa-road text-amber-300"></i>
-                </div>
-                <div>
-                    <h1 class="text-lg md:text-xl font-black text-white tracking-wide flex items-center gap-2">
-                        國道休息站即時雷達
-                        <span class="text-xs bg-amber-400 text-gray-900 px-2 py-0.5 rounded-full font-bold">駕駛版</span>
-                    </h1>
-                    <p class="text-xs text-emerald-200">即時計算剩餘里程與預估到達時間</p>
-                </div>
-            </div>
-            
-            <button id="gpsBtn" onclick="getLocation()" class="btn-touch flex items-center gap-1.5 px-3 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-emerald-100 border border-emerald-600 rounded-lg text-xs font-bold transition shadow active:scale-95">
-                <i class="fa-solid fa-location-crosshairs text-amber-300 text-sm"></i>
-                <span id="gpsStatus">GPS 自動定位</span>
-            </button>
+  <!-- 頂部導覽列 (含返回首頁按鈕) -->
+  <header class="bg-slate-800 border-b border-slate-700 px-4 py-3 sticky top-0 z-50 flex items-center justify-between">
+    <a href="../../index.html" class="flex items-center text-slate-300 hover:text-white text-sm font-medium py-1 px-2 rounded-lg bg-slate-700/50 active:bg-slate-700">
+      <i class="fa-solid fa-chevron-left mr-1.5"></i> 工具清單
+    </a>
+    <h1 class="text-base font-bold text-emerald-400 flex items-center gap-2">
+      <i class="fa-solid fa-road"></i> 休息站即時看板
+    </h1>
+    <div class="w-16"></div> <!-- 保持中間對齊的占位區 -->
+  </header>
+
+  <main class="flex-1 max-w-xl w-full mx-auto p-3 sm:p-5 space-y-4">
+
+    <!-- 控制面板卡片 -->
+    <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700/80 shadow-xl space-y-4">
+      
+      <!-- 選擇國道與方向 (手機版自動滿寬按鈕) -->
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">國道編號</label>
+          <select id="highway-select" onchange="updateView()" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 text-base font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            <option value="1">國道 1 號 (中山高)</option>
+            <option value="3" selected>國道 3 號 (福爾摩沙高)</option>
+            <option value="5">國道 5 號 (蔣渭水高)</option>
+          </select>
         </div>
-    </header>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">行車方向</label>
+          <div class="grid grid-cols-2 gap-1 bg-slate-900 p-1 rounded-xl border border-slate-700">
+            <button id="btn-south" onclick="setDirection('south')" class="py-2.5 rounded-lg text-sm font-bold transition-all bg-emerald-600 text-white">南下</button>
+            <button id="btn-north" onclick="setDirection('north')" class="py-2.5 rounded-lg text-sm font-bold transition-all text-slate-400">北上</button>
+          </div>
+        </div>
+      </div>
 
-    <!-- Main Container -->
-    <main class="max-w-4xl mx-auto px-4 pt-4 space-y-5">
+      <!-- 目前位置 K 數調整區 -->
+      <div>
+        <div class="flex justify-between items-center mb-1">
+          <label class="text-xs font-semibold text-slate-400">當前位置 (里程 K)</label>
+          <span class="text-xs text-slate-500">可直接輸入或按按鈕</span>
+        </div>
+        
+        <div class="flex items-center gap-2">
+          <span class="text-2xl font-black text-slate-500">K</span>
+          <input type="number" id="current-k" value="70" oninput="updateView()" class="w-full bg-slate-900 border border-slate-700 text-emerald-400 rounded-xl p-3 text-3xl font-black text-center focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
 
-        <!-- Controls Panel -->
-        <section class="bg-gray-800/90 rounded-2xl p-4 md:p-5 border border-gray-700 shadow-xl space-y-4">
-            
-            <!-- Highway Selector -->
+        <!-- 手機大按鈕微調列 -->
+        <div class="grid grid-cols-4 gap-2 mt-3">
+          <button onclick="adjustK(-5)" class="py-3 bg-slate-700/60 active:bg-slate-600 text-slate-200 font-bold rounded-xl text-base">-5k</button>
+          <button onclick="adjustK(-1)" class="py-3 bg-slate-700/60 active:bg-slate-600 text-slate-200 font-bold rounded-xl text-base">-1k</button>
+          <button onclick="adjustK(1)" class="py-3 bg-slate-700/60 active:bg-slate-600 text-slate-200 font-bold rounded-xl text-base">+1k</button>
+          <button onclick="adjustK(5)" class="py-3 bg-slate-700/60 active:bg-slate-600 text-slate-200 font-bold rounded-xl text-base">+5k</button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- 下一個休息站（超大號 Alert 區塊） -->
+    <section id="next-station-card" class="bg-emerald-600 text-white rounded-2xl p-5 shadow-lg relative overflow-hidden transition-all">
+      <!-- 內容將由 JS 動態渲染 -->
+    </section>
+
+    <!-- 後續休息站清單 -->
+    <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700/80 space-y-3">
+      <h3 class="text-sm font-bold text-slate-400 flex items-center gap-2">
+        <i class="fa-solid fa-list-ol"></i> 後續休息站預覽
+      </h3>
+      <div id="upcoming-list" class="space-y-2">
+        <!-- JS 動態產生 -->
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // 國道休息站資料集 (包含單向站點限制)
+    const stationsData = {
+      1: [
+        { name: "中壢服務區", k: 55, dir: "both" },
+        { name: "湖口服務區", k: 86, dir: "both" },
+        { name: "泰安服務區", k: 158, dir: "both" },
+        { name: "西螺服務區", k: 229, dir: "both" },
+        { name: "新營服務區", k: 284, dir: "both" },
+        { name: "仁德服務區", k: 316, dir: "both" }
+      ],
+      3: [
+        { name: "木柵休息站", k: 25, dir: "north" }, // 僅北上
+        { name: "關西服務區", k: 55, dir: "both" },
+        { name: "寶山休息站", k: 96, dir: "south" }, // 僅南下
+        { name: "西湖服務區", k: 135, dir: "both" },
+        { name: "清水服務區", k: 172, dir: "both" },
+        { name: "南投服務區", k: 224, dir: "both" },
+        { name: "古坑服務區", k: 269, dir: "both" },
+        { name: "東山服務區", k: 319, dir: "both" },
+        { name: "關廟服務區", k: 363, dir: "both" }
+      ],
+      5: [
+        { name: "石碇服務區", k: 4, dir: "both" },
+        { name: "蘇澳服務區", k: 54, dir: "both" }
+      ]
+    };
+
+    let currentDir = 'south';
+
+    function setDirection(dir) {
+      currentDir = dir;
+      const btnSouth = document.getElementById('btn-south');
+      const btnNorth = document.getElementById('btn-north');
+      
+      if(dir === 'south') {
+        btnSouth.className = "py-2.5 rounded-lg text-sm font-bold transition-all bg-emerald-600 text-white";
+        btnNorth.className = "py-2.5 rounded-lg text-sm font-bold transition-all text-slate-400";
+      } else {
+        btnNorth.className = "py-2.5 rounded-lg text-sm font-bold transition-all bg-emerald-600 text-white";
+        btnSouth.className = "py-2.5 rounded-lg text-sm font-bold transition-all text-slate-400";
+      }
+      updateView();
+    }
+
+    function adjustK(val) {
+      const input = document.getElementById('current-k');
+      let current = parseFloat(input.value) || 0;
+      input.value = Math.max(0, current + val);
+      updateView();
+    }
+
+    function updateView() {
+      const highway = document.getElementById('highway-select').value;
+      const currentK = parseFloat(document.getElementById('current-k').value) || 0;
+      
+      const list = stationsData[highway] || [];
+      
+      // 1. 過濾方向 (both 或 符合當前方向)
+      let validStations = list.filter(s => s.dir === 'both' || s.dir === currentDir);
+      
+      // 2. 根據南下/北上計算剩餘里程與排序
+      let upcoming = [];
+      if(currentDir === 'south') {
+        // 南下：K數增加，找 K > currentK
+        upcoming = validStations
+          .filter(s => s.k > currentK)
+          .map(s => ({ ...s, dist: (s.k - currentK).toFixed(1) }))
+          .sort((a,b) => a.k - b.k);
+      } else {
+        // 北上：K數減少，找 K < currentK
+        upcoming = validStations
+          .filter(s => s.k < currentK)
+          .map(s => ({ ...s, dist: (currentK - s.k).toFixed(1) }))
+          .sort((a,b) => b.k - a.k);
+      }
+
+      // 渲染下一個休息站 Alert 卡片
+      const card = document.getElementById('next-station-card');
+      if (upcoming.length > 0) {
+        const next = upcoming[0];
+        const mins = Math.round((next.dist / 100) * 60); // 假設時速 100km/h
+        card.innerHTML = `
+          <div class="text-xs font-bold uppercase tracking-wider text-emerald-200">Next Rest Area • 即將到達</div>
+          <div class="text-3xl font-black mt-1 mb-2">${next.name} <span class="text-lg font-normal text-emerald-100">(${next.k}K)</span></div>
+          <div class="flex items-baseline gap-3">
+            <div><span class="text-4xl font-extrabold">${next.dist}</span> <span class="text-sm">KM</span></div>
+            <div class="text-slate-900 bg-white/90 px-3 py-1 rounded-full text-xs font-bold">預估 ~${mins} 分鐘</div>
+          </div>
+        `;
+        card.className = "bg-emerald-600 text-white rounded-2xl p-5 shadow-lg relative overflow-hidden transition-all";
+      } else {
+        card.innerHTML = `
+          <div class="text-lg font-bold">前方方向已無休息站</div>
+          <div class="text-xs text-slate-200 mt-1">您已通過該國道當前方向的所有休息站。</div>
+        `;
+        card.className = "bg-slate-700 text-white rounded-2xl p-5 shadow-lg transition-all";
+      }
+
+      // 渲染後續清單
+      const listContainer = document.getElementById('upcoming-list');
+      if(upcoming.length > 1) {
+        listContainer.innerHTML = upcoming.slice(1).map(s => `
+          <div class="flex justify-between items-center p-3 bg-slate-900/60 rounded-xl border border-slate-700/50">
             <div>
-                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-                    <i class="fa-solid fa-diamond text-emerald-400 mr-1"></i>選擇國道線路
-                </label>
-                <div class="grid grid-cols-3 gap-2" id="highwaySelector">
-                    <button onclick="selectHighway('N1')" id="btn-N1" class="highway-btn btn-touch py-3 rounded-xl border-2 text-center font-extrabold text-base transition flex flex-col items-center justify-center gap-1 bg-emerald-700 border-white text-white shadow-lg">
-                        <span class="text-xs font-normal opacity-90">國道 1 號</span>
-                        <span>中山高</span>
-                    </button>
-                    <button onclick="selectHighway('N3')" id="btn-N3" class="highway-btn btn-touch py-3 rounded-xl border-2 text-center font-extrabold text-base transition flex flex-col items-center justify-center gap-1 bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-650">
-                        <span class="text-xs font-normal opacity-90">國道 3 號</span>
-                        <span>福爾摩沙高</span>
-                    </button>
-                    <button onclick="selectHighway('N5')" id="btn-N5" class="highway-btn btn-touch py-3 rounded-xl border-2 text-center font-extrabold text-base transition flex flex-col items-center justify-center gap-1 bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-650">
-                        <span class="text-xs font-normal opacity-90">國道 5 號</span>
-                        <span>蔣渭水高</span>
-                    </button>
-                </div>
+              <div class="font-bold text-white">${s.name}</div>
+              <div class="text-xs text-slate-400">${s.k} K</div>
             </div>
-
-            <!-- Direction & Speed Controls -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                <!-- Direction Toggle -->
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-                        <i class="fa-solid fa-compass text-emerald-400 mr-1"></i>行車方向
-                    </label>
-                    <div class="grid grid-cols-2 gap-2 bg-gray-900 p-1.5 rounded-xl border border-gray-700">
-                        <button onclick="setDirection('south')" id="dir-south" class="btn-touch py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 bg-emerald-600 text-white shadow">
-                            <i class="fa-solid fa-arrow-down-long text-amber-300"></i> 南下 (KM增加)
-                        </button>
-                        <button onclick="setDirection('north')" id="dir-north" class="btn-touch py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 bg-transparent text-gray-400 hover:text-white">
-                            <i class="fa-solid fa-arrow-up-long"></i> 北上 (KM減少)
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Major Interchange Quick Jump -->
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-                        <i class="fa-solid fa-map-pin text-emerald-400 mr-1"></i>快速選擇附近交流道/起點
-                    </label>
-                    <select id="nodeSelect" onchange="onNodeSelect(this.value)" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-gray-200 font-medium focus:outline-none focus:border-emerald-500">
-                        <!-- Populated by JS -->
-                    </select>
-                </div>
+            <div class="text-right">
+              <div class="text-emerald-400 font-extrabold">${s.dist} km</div>
+              <div class="text-xs text-slate-500">~${Math.round((s.dist/100)*60)} 分鐘</div>
             </div>
+          </div>
+        `).join('');
+      } else if(upcoming.length === 1) {
+        listContainer.innerHTML = `<div class="text-xs text-slate-500 text-center py-2">無更多後續休息站</div>`;
+      } else {
+        listContainer.innerHTML = `<div class="text-xs text-slate-500 text-center py-2">--</div>`;
+      }
+    }
 
-            <!-- Current Location (KM Input & Quick Fine-Tune) -->
-            <div class="bg-gray-900/80 p-3.5 rounded-xl border border-gray-750 space-y-3">
-                <div class="flex items-center justify-between flex-wrap gap-2">
-                    <label class="text-sm font-bold text-gray-200 flex items-center gap-2">
-                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        當前位置公里數 (K)
-                    </label>
-                    <span class="text-xs text-gray-400">目前設定時速: <span id="speedDisplay" class="text-amber-400 font-bold">100</span> km/h</span>
-                </div>
-
-                <div class="flex items-center gap-2">
-                    <div class="relative flex-1">
-                        <input type="number" id="mileageInput" step="0.1" min="0" max="500" value="100.0" 
-                               oninput="onMileageChange()" 
-                               class="w-full bg-gray-800 text-amber-400 font-black text-2xl md:text-3xl px-4 py-2 rounded-xl border-2 border-emerald-600 focus:outline-none focus:border-amber-400 text-center tracking-wider">
-                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-base">K</span>
-                    </div>
-
-                    <!-- Fine tune adjustments -->
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                        <button onclick="adjustMileage(-5)" class="btn-touch px-3 py-2 bg-gray-800 hover:bg-gray-700 active:bg-gray-600 border border-gray-600 rounded-lg text-xs font-bold text-gray-200">-5k</button>
-                        <button onclick="adjustMileage(-1)" class="btn-touch px-3 py-2 bg-gray-800 hover:bg-gray-700 active:bg-gray-600 border border-gray-600 rounded-lg text-xs font-bold text-gray-200">-1k</button>
-                        <button onclick="adjustMileage(1)" class="btn-touch px-3 py-2 bg-gray-800 hover:bg-gray-700 active:bg-gray-600 border border-gray-600 rounded-lg text-xs font-bold text-gray-200">+1k</button>
-                        <button onclick="adjustMileage(5)" class="btn-touch px-3 py-2 bg-gray-800 hover:bg-gray-700 active:bg-gray-600 border border-gray-600 rounded-lg text-xs font-bold text-gray-200">+5k</button>
-                    </div>
-                </div>
-            </div>
-
-        </section>
-
-        <!-- Immediate Next Rest Stop Spotlight -->
-        <section id="nextRestAreaSpotlight" class="transition-all duration-300">
-            <!-- Dynamic Content populated by JS -->
-        </section>
-
-        <!-- Progress Bar & Upcoming Rest Areas Section -->
-        <section class="bg-gray-800/90 rounded-2xl p-4 md:p-5 border border-gray-700 shadow-xl space-y-4">
-            <div class="flex items-center justify-between border-b border-gray-700 pb-3">
-                <h3 class="text-base font-bold text-white flex items-center gap-2">
-                    <i class="fa-solid fa-route text-emerald-400"></i> 後續休息站里程軸
-                </h3>
-                <span id="restAreaCountTag" class="text-xs bg-gray-700 text-gray-300 px-2.5 py-1 rounded-full font-medium">前方還有 0 個休息站</span>
-            </div>
-
-            <!-- Route Visual Timeline Bar -->
-            <div class="space-y-2 pt-2">
-                <div class="flex justify-between text-xs text-gray-400 font-mono font-bold">
-                    <span id="startKmLabel">0 K</span>
-                    <span id="currentKmBadge" class="text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/30">您在 100.0 K</span>
-                    <span id="endKmLabel">373 K</span>
-                </div>
-
-                <!-- Highway track container -->
-                <div class="relative h-6 bg-gray-950 rounded-full border border-gray-700 p-0.5 overflow-hidden">
-                    <!-- Dynamic Progress Fill -->
-                    <div id="timelineProgress" class="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-300" style="width: 25%;"></div>
-                    <!-- Rest stop markers injected here -->
-                    <div id="timelineMarkers" class="absolute inset-0 pointer-events-none"></div>
-                </div>
-            </div>
-
-            <!-- Rest Stop Cards List -->
-            <div id="upcomingRestAreasList" class="space-y-3 pt-2">
-                <!-- Cards Injected dynamically by JS -->
-            </div>
-        </section>
-
-    </main>
-
-    <script>
-        /**
-         * Comprehensive Taiwan Highway Service Areas & Rest Stops Data
-         * k: Kilometer mark
-         * dir: 'both' | 'south' | 'north'
-         */
-        const highwayData = {
-            'N1': {
-                name: '國道 1 號 (中山高)',
-                maxKm: 373,
-                minKm: 0,
-                nodes: [
-                    { name: '基隆端', k: 0 },
-                    { name: '台北交流道', k: 25 },
-                    { name: '林口交流道', k: 41 },
-                    { name: '中壢轉接道', k: 59 },
-                    { name: '新竹系統', k: 99 },
-                    { name: '台中交流道', k: 178 },
-                    { name: '彰化系統', k: 192 },
-                    { name: '嘉義交流道', k: 264 },
-                    { name: '台南交流道', k: 327 },
-                    { name: '高雄端', k: 373 }
-                ],
-                restAreas: [
-                    { id: 'n1-zhongli', name: '中壢服務區', k: 55, dir: 'both', desc: '設有加油站、超商、餐飲區，雙向均可進入', features: ['加油站', '充電站', '便利商店', '美食街'] },
-                    { id: 'n1-hukou', name: '湖口服務區', k: 86, dir: 'both', desc: '具特色懷旧客家風格，雙向設有豐富餐飲區', features: ['加油站', '充電站', '三麗鷗主題', '兒童遊戲區'] },
-                    { id: 'n1-taian', name: '泰安服務區', k: 158, dir: 'both', desc: '著名的積木城堡星巴克，設有南北兩側大區域', features: ['積木城堡', '加油站', '充電站', '育嬰室'] },
-                    { id: 'n1-xiluo', name: '西螺服務區', k: 229, dir: 'both', desc: '雲林在地特產醬油專區與休息停靠大站', features: ['加油站', '充電站', '在地伴手禮', '淋浴間'] },
-                    { id: 'n1-xinying', name: '新營服務區', k: 284, dir: 'both', desc: '南台灣主要服務區，雙向設有休閒園區', features: ['加油站', '充電站', '便當/美食', '駕駛休息室'] },
-                    { id: 'n1-rende', name: '仁德服務區', k: 335, dir: 'both', desc: '國道1號最南端的服務區，近奇美博物館', features: ['加油站', '充電站', '超商', '休息區'] }
-                ]
-            },
-            'N3': {
-                name: '國道 3 號 (福爾摩沙高)',
-                maxKm: 421,
-                minKm: 0,
-                nodes: [
-                    { name: '基金交流道', k: 0 },
-                    { name: '南港系統', k: 16 },
-                    { name: '三峽交流道', k: 50 },
-                    { name: '關西交流道', k: 79 },
-                    { name: '竹山交流道', k: 243 },
-                    { name: '古坑系統', k: 269 },
-                    { name: '燕巢系統', k: 383 },
-                    { name: '大鵬灣端', k: 421 }
-                ],
-                restAreas: [
-                    { id: 'n3-muzha', name: '木柵休息站', k: 25, dir: 'north', desc: '【僅北上可進入】小型休息站，設有停車場與洗手間', features: ['洗手間', '自動販賣機', '停車區'] },
-                    { id: 'n3-guanxi', name: '關西服務區', k: 76, dir: 'both', desc: '著名的客家美食特色區，仙草與客家便當廣受好評', features: ['客家美食', '加油站', '充電站', '觀景區'] },
-                    { id: 'n3-baoshan', name: '寶山休息站', k: 96, dir: 'south', desc: '【僅南下可進入】簡易休息站，提供洗手間與超商', features: ['超商', '洗手間', '停車場'] },
-                    { id: 'n3-xihu', name: '西湖服務區', k: 134, dir: 'both', desc: '跨越高速公路天橋設計，可俯瞰車流景色', features: ['跨越橋餐廳', '加油站', '充電站', '咖啡廳'] },
-                    { id: 'n3-qingshui', name: '清水服務區', k: 172, dir: 'both', desc: '全台營業額最高服務區！著名夜景與大型水族箱', features: ['美麗夜景', '大型水景', '加油站', '充電站', '排隊美食'] },
-                    { id: 'n3-nantou', name: '南投服務區', k: 231, dir: 'both', desc: '原住民文化特色，觀景台可眺望南投市區景致', features: ['原民特色', '加油站', '充電站', '觀景台'] },
-                    { id: 'n3-gukeng', name: '古坑服務區', k: 276, dir: 'both', desc: '花園景觀服務區，以古坑咖啡為最大特色', features: ['古坑咖啡', '音樂噴泉', '加油站', '充電站'] },
-                    { id: 'n3-dongshan', name: '東山服務區', k: 319, dir: 'both', desc: '擁有大榕樹公園廣場與親水水舞噴泉', features: ['百年大榕樹', '魚頭君/寵物公園', '加油站', '充電站'] },
-                    { id: 'n3-guanmiao', name: '關廟服務區', k: 363, dir: 'both', desc: '設有草泥馬/羊駝特色主題造景與鳳梨特產區', features: ['鳳梨特色', '加油站', '充電站', '休息區'] }
-                ]
-            },
-            'N5': {
-                name: '國道 5 號 (蔣渭水高)',
-                maxKm: 54,
-                minKm: 0,
-                nodes: [
-                    { name: '南港系統', k: 0 },
-                    { name: '石碇交流道', k: 4 },
-                    { name: '坪林交流道', k: 15 },
-                    { name: '頭城交流道', k: 30 },
-                    { name: '宜蘭交流道', k: 38 },
-                    { name: '蘇澳端', k: 54 }
-                ],
-                restAreas: [
-                    { id: 'n5-shiding', name: '石碇服務區', k: 4, dir: 'both', desc: '進出雪山隧道前的重要休憩補給點', features: ['超商', '熟食區', '洗手間', '加油站(附近)'] },
-                    { id: 'n5-suao', name: '蘇澳服務區', k: 54, dir: 'both', desc: '造型如大船入港，連結國5與蘇花改之樞紐大站', features: ['大船外觀', '宜蘭名產', '加油站', '充電站', '超商'] }
-                ]
-            }
-        };
-
-        // App State Variables
-        let state = {
-            highway: 'N1',
-            direction: 'south', // 'south' (KM increases) or 'north' (KM decreases)
-            currentKm: 100.0,
-            speedKmh: 100 // default highway speed limit
-        };
-
-        window.addEventListener('DOMContentLoaded', () => {
-            initApp();
-        });
-
-        function initApp() {
-            renderNodeOptions();
-            updateDashboard();
-        }
-
-        // Handle Highway Switch
-        function selectHighway(hwKey) {
-            state.highway = hwKey;
-            
-            // Update UI buttons styling
-            ['N1', 'N3', 'N5'].forEach(key => {
-                const btn = document.getElementById(`btn-${key}`);
-                if (key === hwKey) {
-                    btn.className = "highway-btn btn-touch py-3 rounded-xl border-2 text-center font-extrabold text-base transition flex flex-col items-center justify-center gap-1 bg-emerald-700 border-white text-white shadow-lg scale-105";
-                } else {
-                    btn.className = "highway-btn btn-touch py-3 rounded-xl border-2 text-center font-extrabold text-base transition flex flex-col items-center justify-center gap-1 bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-650";
-                }
-            });
-
-            // Adjust default KM to fit valid range
-            const hwInfo = highwayData[hwKey];
-            if (state.currentKm > hwInfo.maxKm) {
-                state.currentKm = Math.round(hwInfo.maxKm / 2);
-            }
-
-            document.getElementById('mileageInput').value = state.currentKm.toFixed(1);
-            renderNodeOptions();
-            updateDashboard();
-        }
-
-        // Handle Direction Switch
-        function setDirection(dir) {
-            state.direction = dir;
-            const southBtn = document.getElementById('dir-south');
-            const northBtn = document.getElementById('dir-north');
-
-            if (dir === 'south') {
-                southBtn.className = "btn-touch py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 bg-emerald-600 text-white shadow";
-                northBtn.className = "btn-touch py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 bg-transparent text-gray-400 hover:text-white";
-            } else {
-                northBtn.className = "btn-touch py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 bg-emerald-600 text-white shadow";
-                southBtn.className = "btn-touch py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 bg-transparent text-gray-400 hover:text-white";
-            }
-
-            updateDashboard();
-        }
-
-        // Handle Mileage Change via Input
-        function onMileageChange() {
-            const val = parseFloat(document.getElementById('mileageInput').value);
-            if (!isNaN(val)) {
-                state.currentKm = Math.max(0, Math.min(500, val));
-                updateDashboard();
-            }
-        }
-
-        // Adjust Mileage Buttons (+1, -1, +5, -5)
-        function adjustMileage(delta) {
-            state.currentKm = Math.max(0, Math.min(500, state.currentKm + delta));
-            document.getElementById('mileageInput').value = state.currentKm.toFixed(1);
-            updateDashboard();
-        }
-
-        // Populates major nodes selector
-        function renderNodeOptions() {
-            const nodeSelect = document.getElementById('nodeSelect');
-            nodeSelect.innerHTML = '';
-            
-            const hw = highwayData[state.highway];
-            hw.nodes.forEach(node => {
-                const option = document.createElement('option');
-                option.value = node.k;
-                option.textContent = `${node.name} (${node.k} K)`;
-                nodeSelect.appendChild(option);
-            });
-        }
-
-        function onNodeSelect(val) {
-            state.currentKm = parseFloat(val);
-            document.getElementById('mileageInput').value = state.currentKm.toFixed(1);
-            updateDashboard();
-        }
-
-        // Main Refresh/Calculation Engine
-        function updateDashboard() {
-            const hw = highwayData[state.highway];
-            const isSouth = state.direction === 'south';
-
-            // Filter rest stops that are valid for current direction
-            const validRestAreas = hw.restAreas.filter(ra => {
-                if (ra.dir === 'both') return true;
-                return ra.dir === state.direction;
-            });
-
-            // Filter rest areas ahead of current mileage based on direction
-            let upcoming = validRestAreas.filter(ra => {
-                return isSouth ? (ra.k > state.currentKm) : (ra.k < state.currentKm);
-            });
-
-            // Sort upcoming rest areas by arrival sequence
-            upcoming.sort((a, b) => {
-                return isSouth ? (a.k - b.k) : (b.k - a.k);
-            });
-
-            // Render Immediate Spotlight Card
-            renderSpotlight(upcoming[0]);
-
-            // Render Timeline & List
-            renderTimeline(validRestAreas, upcoming);
-            renderUpcomingList(upcoming);
-        }
-
-        function renderSpotlight(nextArea) {
-            const spotlightContainer = document.getElementById('nextRestAreaSpotlight');
-
-            if (!nextArea) {
-                spotlightContainer.innerHTML = `
-                    <div class="bg-gray-800/90 border-2 border-dashed border-gray-700 rounded-2xl p-6 text-center shadow-xl">
-                        <i class="fa-solid fa-flag-checkered text-4xl text-amber-400 mb-2"></i>
-                        <h2 class="text-xl font-black text-white">前方無更多適用休息站</h2>
-                        <p class="text-xs text-gray-400 mt-1">您已駛過此方向所有的服務區或休息站，請留意行車安全。</p>
-                    </div>
-                `;
-                return;
-            }
-
-            const distKm = Math.abs(nextArea.k - state.currentKm);
-            const timeMinutes = Math.round((distKm / state.speedKmh) * 60);
-
-            // Time badge color logic
-            let timeColorClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
-            if (timeMinutes <= 5) {
-                timeColorClass = "bg-red-500/20 text-red-300 border-red-500/40 animate-pulse";
-            } else if (timeMinutes <= 15) {
-                timeColorClass = "bg-amber-500/20 text-amber-300 border-amber-500/40";
-            }
-
-            spotlightContainer.innerHTML = `
-                <div class="bg-gradient-to-br from-freeway-signBg to-emerald-950 border-2 border-emerald-500/70 rounded-2xl p-5 md:p-6 shadow-2xl relative overflow-hidden">
-                    <div class="absolute -right-6 -bottom-6 opacity-10 text-emerald-400 text-9xl font-black pointer-events-none">
-                        <i class="fa-solid fa-utensils"></i>
-                    </div>
-
-                    <div class="flex items-center justify-between gap-2 mb-3">
-                        <span class="inline-flex items-center gap-1.5 bg-emerald-600 text-white text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                            <i class="fa-solid fa-bullseye text-amber-300"></i> 下一個休息站
-                        </span>
-                        <span class="text-xs font-mono font-bold text-gray-300 bg-gray-900/80 px-2.5 py-1 rounded-md border border-gray-700">
-                            里程標記：${nextArea.k} K
-                        </span>
-                    </div>
-
-                    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                        <div>
-                            <h2 class="text-3xl md:text-4xl font-black text-white tracking-tight flex items-center gap-3">
-                                ${nextArea.name}
-                                ${nextArea.dir !== 'both' ? `<span class="text-xs font-bold bg-amber-500 text-gray-950 px-2 py-0.5 rounded">${nextArea.dir === 'south' ? '僅南下' : '僅北上'}</span>` : ''}
-                            </h2>
-                            <p class="text-sm text-emerald-200/90 mt-1 max-w-md">${nextArea.desc}</p>
-                            
-                            <!-- Tags -->
-                            <div class="flex flex-wrap gap-1.5 mt-3">
-                                ${nextArea.features.map(f => `<span class="bg-emerald-900/80 text-emerald-200 border border-emerald-700/60 text-xs px-2.5 py-0.5 rounded-md">${f}</span>`).join('')}
-                            </div>
-                        </div>
-
-                        <!-- Distance & Time Banner -->
-                        <div class="bg-gray-900/90 border border-emerald-500/50 rounded-xl p-3.5 md:p-4 text-center md:text-right flex md:flex-col justify-around items-center md:items-end gap-2 shadow-inner">
-                            <div>
-                                <span class="text-xs text-gray-400 block font-medium">剩餘距離</span>
-                                <span class="text-3xl md:text-4xl font-black text-amber-400 font-mono tracking-tight">${distKm.toFixed(1)} <span class="text-sm font-normal text-gray-300">KM</span></span>
-                            </div>
-                            <div class="border-l md:border-l-0 md:border-t border-gray-800 pl-3 md:pl-0 md:pt-2 w-full">
-                                <span class="inline-block border ${timeColorClass} px-3 py-1 rounded-lg text-sm font-bold">
-                                    <i class="fa-regular fa-clock mr-1"></i> 約 ${timeMinutes} 分鐘到達
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderTimeline(allValidRestAreas, upcomingRestAreas) {
-            const hw = highwayData[state.highway];
-            const isSouth = state.direction === 'south';
-
-            document.getElementById('startKmLabel').textContent = isSouth ? `${hw.minKm} K` : `${hw.maxKm} K`;
-            document.getElementById('endKmLabel').textContent = isSouth ? `${hw.maxKm} K` : `${hw.minKm} K`;
-            document.getElementById('currentKmBadge').textContent = `您在 ${state.currentKm.toFixed(1)} K`;
-            document.getElementById('restAreaCountTag').textContent = `前方還有 ${upcomingRestAreas.length} 個休息站`;
-
-            // Calculate progress percentage
-            let progress = 0;
-            if (isSouth) {
-                progress = (state.currentKm - hw.minKm) / (hw.maxKm - hw.minKm) * 100;
-            } else {
-                progress = (hw.maxKm - state.currentKm) / (hw.maxKm - hw.minKm) * 100;
-            }
-            progress = Math.max(0, Math.min(100, progress));
-            document.getElementById('timelineProgress').style.width = `${progress}%`;
-
-            // Render Rest Stop Markers on the track
-            const markersContainer = document.getElementById('timelineMarkers');
-            markersContainer.innerHTML = '';
-
-            allValidRestAreas.forEach(ra => {
-                let posPercent = 0;
-                if (isSouth) {
-                    posPercent = (ra.k - hw.minKm) / (hw.maxKm - hw.minKm) * 100;
-                } else {
-                    posPercent = (hw.maxKm - ra.k) / (hw.maxKm - hw.minKm) * 100;
-                }
-
-                const isPassed = isSouth ? (state.currentKm >= ra.k) : (state.currentKm <= ra.k);
-
-                const marker = document.createElement('div');
-                marker.className = `absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full border-2 ${isPassed ? 'bg-gray-600 border-gray-400' : 'bg-amber-400 border-white shadow-md font-bold'}`;
-                marker.style.left = `${posPercent}%`;
-                marker.title = `${ra.name} (${ra.k}K)`;
-                markersContainer.appendChild(marker);
-            });
-        }
-
-        function renderUpcomingList(upcoming) {
-            const container = document.getElementById('upcomingRestAreasList');
-            container.innerHTML = '';
-
-            if (upcoming.length <= 1) {
-                container.innerHTML = `<p class="text-center text-xs text-gray-500 py-3">沒有更多後續休息站</p>`;
-                return;
-            }
-
-            // Skip index 0 because it's rendered in the Spotlight Card
-            const remaining = upcoming.slice(1);
-
-            remaining.forEach((ra, index) => {
-                const distKm = Math.abs(ra.k - state.currentKm);
-                const timeMinutes = Math.round((distKm / state.speedKmh) * 60);
-
-                const card = document.createElement('div');
-                card.className = "bg-gray-900/80 hover:bg-gray-750 border border-gray-750 rounded-xl p-3.5 flex items-center justify-between transition gap-3";
-                card.innerHTML = `
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-gray-800 text-emerald-400 flex items-center justify-center font-bold text-sm border border-gray-700">
-                            ${index + 2}
-                        </div>
-                        <div>
-                            <h4 class="font-bold text-white text-sm md:text-base flex items-center gap-2">
-                                ${ra.name}
-                                <span class="text-xs font-mono text-gray-400">(${ra.k} K)</span>
-                            </h4>
-                            <p class="text-xs text-gray-400 truncate max-w-[200px] sm:max-w-xs">${ra.features.slice(0, 3).join(' • ')}</p>
-                        </div>
-                    </div>
-
-                    <div class="text-right">
-                        <div class="text-lg font-black text-amber-400 font-mono">${distKm.toFixed(1)} <span class="text-xs font-normal text-gray-400">km</span></div>
-                        <div class="text-xs text-gray-400">約 ${timeMinutes} 分鐘</div>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        function getLocation() {
-            const gpsStatus = document.getElementById('gpsStatus');
-            const gpsBtn = document.getElementById('gpsBtn');
-
-            if (!navigator.geolocation) {
-                alert('您的瀏覽器不支援 GPS 地理定位功能');
-                return;
-            }
-
-            gpsStatus.textContent = '定位中...';
-            gpsBtn.classList.add('animate-pulse');
-
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    gpsBtn.classList.remove('animate-pulse');
-                    gpsStatus.textContent = '定位成功';
-
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-
-                    // Rough estimation of current highway position based on lat/lng (Taiwan bbox)
-                    estimateHighwayByCoords(lat, lng);
-
-                    setTimeout(() => {
-                        gpsStatus.textContent = 'GPS 自動定位';
-                    }, 3000);
-                },
-                (error) => {
-                    gpsBtn.classList.remove('animate-pulse');
-                    gpsStatus.textContent = '定位失敗';
-                    alert('無法取得 GPS 位置，請確認權限或改為手動調整里程。');
-                    setTimeout(() => {
-                        gpsStatus.textContent = 'GPS 自動定位';
-                    }, 3000);
-                },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
-        }
-
-        // Simple latitude interpolation demo for Taiwan freeways
-        function estimateHighwayByCoords(lat, lng) {
-            // Taiwan latitude range: 21.9 to 25.3
-            // Simplified mapping for demonstration: 
-            // 25.04 N -> N1 ~25K / N3 ~16K
-            // 24.15 N -> N1 ~178K / N3 ~172K
-            // 22.62 N -> N1 ~360K / N3 ~380K
-
-            // Simple latitude formula estimate for Highway 1
-            if (state.highway === 'N1') {
-                let estKm = (25.05 - lat) * 110 + 25;
-                if (estKm < 0) estKm = 10;
-                if (estKm > 373) estKm = 370;
-                state.currentKm = Math.round(estKm * 10) / 10;
-            } else if (state.highway === 'N3') {
-                let estKm = (25.05 - lat) * 115 + 20;
-                if (estKm < 0) estKm = 10;
-                if (estKm > 421) estKm = 410;
-                state.currentKm = Math.round(estKm * 10) / 10;
-            }
-
-            document.getElementById('mileageInput').value = state.currentKm.toFixed(1);
-            updateDashboard();
-        }
-    </script>
+    // 初始化執行
+    updateView();
+  </script>
 </body>
 </html>
