@@ -2,7 +2,6 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <!-- 針對手機最佳化，防止使用者縮放影響駕駛操作 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>國道休息站即時看板</title>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -12,21 +11,21 @@
       background-color: #0f172a;
       color: #f8fafc;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      touch-action: manipulation; /* 優化手機觸控反應 */
+      touch-action: manipulation;
     }
   </style>
 </head>
 <body class="min-h-screen flex flex-col pb-10">
 
-  <!-- 頂部導覽列 (含返回首頁按鈕) -->
+  <!-- 頂部導覽列 -->
   <header class="bg-slate-800 border-b border-slate-700 px-4 py-3 sticky top-0 z-50 flex items-center justify-between">
-    <a href="../../index.html" class="flex items-center text-slate-300 hover:text-white text-sm font-medium py-1 px-2 rounded-lg bg-slate-700/50 active:bg-slate-700">
+    <a href="../../index.html" class="flex items-center text-slate-300 hover:text-white text-sm font-medium py-1 px-2.5 rounded-lg bg-slate-700/50 active:bg-slate-700">
       <i class="fa-solid fa-chevron-left mr-1.5"></i> 工具清單
     </a>
     <h1 class="text-base font-bold text-emerald-400 flex items-center gap-2">
       <i class="fa-solid fa-road"></i> 休息站即時看板
     </h1>
-    <div class="w-16"></div> <!-- 保持中間對齊的占位區 -->
+    <div class="w-16"></div>
   </header>
 
   <main class="flex-1 max-w-xl w-full mx-auto p-3 sm:p-5 space-y-4">
@@ -34,7 +33,7 @@
     <!-- 控制面板卡片 -->
     <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700/80 shadow-xl space-y-4">
       
-      <!-- 選擇國道與方向 (手機版自動滿寬按鈕) -->
+      <!-- 國道選擇與南北向 -->
       <div class="grid grid-cols-2 gap-2">
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1">國道編號</label>
@@ -53,11 +52,14 @@
         </div>
       </div>
 
-      <!-- 目前位置 K 數調整區 -->
+      <!-- 目前位置與單次 GPS 定位按鈕 -->
       <div>
-        <div class="flex justify-between items-center mb-1">
+        <div class="flex justify-between items-center mb-1.5">
           <label class="text-xs font-semibold text-slate-400">當前位置 (里程 K)</label>
-          <span class="text-xs text-slate-500">可直接輸入或按按鈕</span>
+          <!-- GPS 單次定位按鈕 -->
+          <button id="btn-gps" onclick="getLocationOnce()" class="flex items-center gap-1.5 text-xs bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full font-semibold active:bg-emerald-600/40">
+            <i class="fa-solid fa-location-crosshairs"></i> GPS 定位
+          </button>
         </div>
         
         <div class="flex items-center gap-2">
@@ -76,12 +78,12 @@
 
     </section>
 
-    <!-- 下一個休息站（超大號 Alert 區塊） -->
+    <!-- 下一個休息站 Alert 區塊 -->
     <section id="next-station-card" class="bg-emerald-600 text-white rounded-2xl p-5 shadow-lg relative overflow-hidden transition-all">
-      <!-- 內容將由 JS 動態渲染 -->
+      <!-- JS 動態產生 -->
     </section>
 
-    <!-- 後續休息站清單 -->
+    <!-- 後續休息站列表 -->
     <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700/80 space-y-3">
       <h3 class="text-sm font-bold text-slate-400 flex items-center gap-2">
         <i class="fa-solid fa-list-ol"></i> 後續休息站預覽
@@ -94,30 +96,30 @@
   </main>
 
   <script>
-    // 國道休息站資料集 (包含單向站點限制)
+    // 包含 GPS 經緯度座標的休息站資料集
     const stationsData = {
       1: [
-        { name: "中壢服務區", k: 55, dir: "both" },
-        { name: "湖口服務區", k: 86, dir: "both" },
-        { name: "泰安服務區", k: 158, dir: "both" },
-        { name: "西螺服務區", k: 229, dir: "both" },
-        { name: "新營服務區", k: 284, dir: "both" },
-        { name: "仁德服務區", k: 316, dir: "both" }
+        { name: "中壢服務區", k: 55, dir: "both", lat: 24.9708, lng: 121.2298 },
+        { name: "湖口服務區", k: 86, dir: "both", lat: 24.8966, lng: 121.0483 },
+        { name: "泰安服務區", k: 158, dir: "both", lat: 24.3315, lng: 120.7222 },
+        { name: "西螺服務區", k: 229, dir: "both", lat: 23.7744, lng: 120.4682 },
+        { name: "新營服務區", k: 284, dir: "both", lat: 23.3276, lng: 120.2882 },
+        { name: "仁德服務區", k: 316, dir: "both", lat: 22.9567, lng: 120.2520 }
       ],
       3: [
-        { name: "木柵休息站", k: 25, dir: "north" }, // 僅北上
-        { name: "關西服務區", k: 55, dir: "both" },
-        { name: "寶山休息站", k: 96, dir: "south" }, // 僅南下
-        { name: "西湖服務區", k: 135, dir: "both" },
-        { name: "清水服務區", k: 172, dir: "both" },
-        { name: "南投服務區", k: 224, dir: "both" },
-        { name: "古坑服務區", k: 269, dir: "both" },
-        { name: "東山服務區", k: 319, dir: "both" },
-        { name: "關廟服務區", k: 363, dir: "both" }
+        { name: "木柵休息站", k: 25, dir: "north", lat: 24.9892, lng: 121.5832 },
+        { name: "關西服務區", k: 55, dir: "both", lat: 24.8018, lng: 121.1895 },
+        { name: "寶山休息站", k: 96, dir: "south", lat: 24.7562, lng: 120.9995 },
+        { name: "西湖服務區", k: 135, dir: "both", lat: 24.5422, lng: 120.7610 },
+        { name: "清水服務區", k: 172, dir: "both", lat: 24.2662, lng: 120.5702 },
+        { name: "南投服務區", k: 224, dir: "both", lat: 23.9056, lng: 120.7088 },
+        { name: "古坑服務區", k: 269, dir: "both", lat: 23.6338, lng: 120.5794 },
+        { name: "東山服務區", k: 319, dir: "both", lat: 23.2381, lng: 120.4038 },
+        { name: "關廟服務區", k: 363, dir: "both", lat: 22.9463, lng: 120.3292 }
       ],
       5: [
-        { name: "石碇服務區", k: 4, dir: "both" },
-        { name: "蘇澳服務區", k: 54, dir: "both" }
+        { name: "石碇服務區", k: 4, dir: "both", lat: 24.9902, lng: 121.6421 },
+        { name: "蘇澳服務區", k: 54, dir: "both", lat: 24.6062, lng: 121.8262 }
       ]
     };
 
@@ -145,36 +147,91 @@
       updateView();
     }
 
+    // 單次 GPS 定位功能
+    function getLocationOnce() {
+      const btn = document.getElementById('btn-gps');
+      if (!navigator.geolocation) {
+        alert("您的裝置或瀏覽器不支援 GPS 定位");
+        return;
+      }
+
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 定位中...`;
+      
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const userLat = position.coords.latitude;
+          const userLng = position.coords.longitude;
+          const highway = document.getElementById('highway-select').value;
+          const list = stationsData[highway] || [];
+
+          let nearest = null;
+          let minDistance = Infinity;
+
+          // 尋找直線距離最近的休息站
+          list.forEach(s => {
+            const dist = getDistanceInKm(userLat, userLng, s.lat, s.lng);
+            if (dist < minDistance) {
+              minDistance = dist;
+              nearest = s;
+            }
+          });
+
+          if (nearest) {
+            // 自動帶入該休息站里程 K 數（可再利用 +/-1k 做微調）
+            document.getElementById('current-k').value = nearest.k;
+            updateView();
+            btn.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> 已定位`;
+          } else {
+            btn.innerHTML = `<i class="fa-solid fa-location-crosshairs"></i> GPS 定位`;
+          }
+
+          setTimeout(() => {
+            btn.innerHTML = `<i class="fa-solid fa-location-crosshairs"></i> GPS 定位`;
+          }, 3000);
+        },
+        (err) => {
+          alert("無法取得 GPS 位置，請確認手機已開啟定位權限。");
+          btn.innerHTML = `<i class="fa-solid fa-location-crosshairs"></i> GPS 定位`;
+        },
+        { timeout: 8000, enableHighAccuracy: true }
+      );
+    }
+
+    // 計算兩經緯度點直線距離 (Haversine Formula)
+    function getDistanceInKm(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
     function updateView() {
       const highway = document.getElementById('highway-select').value;
       const currentK = parseFloat(document.getElementById('current-k').value) || 0;
       
       const list = stationsData[highway] || [];
-      
-      // 1. 過濾方向 (both 或 符合當前方向)
       let validStations = list.filter(s => s.dir === 'both' || s.dir === currentDir);
       
-      // 2. 根據南下/北上計算剩餘里程與排序
       let upcoming = [];
       if(currentDir === 'south') {
-        // 南下：K數增加，找 K > currentK
         upcoming = validStations
           .filter(s => s.k > currentK)
           .map(s => ({ ...s, dist: (s.k - currentK).toFixed(1) }))
           .sort((a,b) => a.k - b.k);
       } else {
-        // 北上：K數減少，找 K < currentK
         upcoming = validStations
           .filter(s => s.k < currentK)
           .map(s => ({ ...s, dist: (currentK - s.k).toFixed(1) }))
           .sort((a,b) => b.k - a.k);
       }
 
-      // 渲染下一個休息站 Alert 卡片
       const card = document.getElementById('next-station-card');
       if (upcoming.length > 0) {
         const next = upcoming[0];
-        const mins = Math.round((next.dist / 100) * 60); // 假設時速 100km/h
+        const mins = Math.round((next.dist / 100) * 60);
         card.innerHTML = `
           <div class="text-xs font-bold uppercase tracking-wider text-emerald-200">Next Rest Area • 即將到達</div>
           <div class="text-3xl font-black mt-1 mb-2">${next.name} <span class="text-lg font-normal text-emerald-100">(${next.k}K)</span></div>
@@ -192,7 +249,6 @@
         card.className = "bg-slate-700 text-white rounded-2xl p-5 shadow-lg transition-all";
       }
 
-      // 渲染後續清單
       const listContainer = document.getElementById('upcoming-list');
       if(upcoming.length > 1) {
         listContainer.innerHTML = upcoming.slice(1).map(s => `
@@ -214,7 +270,6 @@
       }
     }
 
-    // 初始化執行
     updateView();
   </script>
 </body>
