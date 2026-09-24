@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>肩上工具箱 | Personal Tool Hub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 flex flex-col items-center">
+
+  <header class="max-w-4xl w-full mb-8 text-center pt-6">
+    <div class="inline-flex items-center justify-center p-3 bg-emerald-500/10 rounded-2xl mb-3 text-emerald-400 border border-emerald-500/20">
+      <i class="fa-solid fa-toolbox text-3xl"></i>
+    </div>
+    <h1 class="text-3xl font-extrabold tracking-tight sm:text-4xl">生活工具箱</h1>
+    <p class="mt-2 text-slate-400 text-sm sm:text-base">專為日常情境與行車設計的輕量級 Web 實用工具庫</p>
+  </header>
+
+  <!-- 工具搜尋與過濾 -->
+  <main class="max-w-4xl w-full flex-1">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="tools-grid">
+      
+      <!-- 工具卡片 1：國道休息站即時導航 -->
+      <a href="./tools/highway-rest/index.html" class="group block p-6 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-emerald-500/50 rounded-2xl transition-all duration-200 hover:shadow-lg hover:shadow-emerald-500/10">
+        <div class="flex items-start justify-between">
+          <div class="p-3 bg-emerald-600/20 text-emerald-400 rounded-xl group-hover:scale-110 transition-transform">
+            <i class="fa-solid fa-road text-2xl"></i>
+          </div>
+          <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">行車必備</span>
+        </div>
+        <h2 class="mt-4 text-xl font-bold text-white group-hover:text-emerald-400 transition-colors">國道休息站即時看板</h2>
+        <p class="mt-2 text-sm text-slate-400 line-clamp-2">即時追蹤國 1、國 3、國 5 剩餘距離、下一個休息站與里程軸，支援雙向過濾與大字體操作。</p>
+        <div class="mt-4 flex items-center text-xs font-semibold text-emerald-400">
+          開啟工具 <i class="fa-solid fa-arrow-right ml-1 group-hover:translate-x-1 transition-transform"></i>
+        </div>
+      </a>
+
+      <!-- 未來預留卡片範例 -->
+      <div class="p-6 bg-slate-800/30 border border-dashed border-slate-700/60 rounded-2xl flex flex-col items-center justify-center text-center">
+        <div class="p-3 bg-slate-700/30 text-slate-500 rounded-xl mb-3">
+          <i class="fa-solid fa-plus text-xl"></i>
+        </div>
+        <h3 class="text-base font-medium text-slate-400">更多工具開發中...</h3>
+        <p class="text-xs text-slate-500 mt-1">未來可持續擴充更多實用 Web 小工具</p>
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="mt-12 text-center text-xs text-slate-500 border-t border-slate-800 pt-6 w-full max-w-4xl">
+    © Personal Tools Hub • Hosted on GitHub Pages
+  </footer>
+
+</body>
+</html>
