@@ -88,10 +88,10 @@
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1">行車方向</label>
-          <div class="grid grid-cols-2 gap-1 bg-slate-900 p-1 rounded-xl border border-slate-700">
-            <button id="btn-south" onclick="setDirection('south')" class="py-2.5 rounded-lg text-sm font-bold transition-all bg-emerald-600 text-white">南下</button>
-            <button id="btn-north" onclick="setDirection('north')" class="py-2.5 rounded-lg text-sm font-bold transition-all text-slate-400">北上</button>
-          </div>
+          <select id="direction-select" onchange="onDirectionChange()" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 text-base font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            <option value="2" selected>南下</option>
+            <option value="1">北上</option>
+          </select>
         </div>
       </div>
 
@@ -163,7 +163,7 @@
     let currentDir = 'south';
     let tdxAccessToken = '';
     let isConnectedTDX = false;
-    let mergedTrafficData = []; // 融合靜態與即時後的資料集
+    let mergedTrafficData = []; 
 
     document.addEventListener("DOMContentLoaded", () => {
       const savedId = localStorage.getItem('tdx_client_id') || '';
@@ -234,152 +234,160 @@
       }
     }
 
-async function fetchAllTDXData() {
-  const highway = document.getElementById('highway-select').value;
-  const tag = document.getElementById('traffic-source-tag');
-  const dot = document.getElementById('traffic-status-dot');
+    async function fetchAllTDXData() {
+      const highway = document.getElementById('highway-select').value;
+      const directionSelect = document.getElementById('direction-select');
+      const direction = directionSelect ? Number(directionSelect.value) : 2; // 1: 北上, 2: 南下
 
-  tag.innerText = "驗證金鑰並抓取即時車速...";
-  dot.className = "w-2 h-2 rounded-full bg-amber-500 animate-pulse";
+      const tag = document.getElementById('traffic-source-tag');
+      const dot = document.getElementById('traffic-status-dot');
 
-  tdxAccessToken = await getTDXToken();
+      tag.innerText = "正在同步多國道即時路段車速...";
+      dot.className = "w-2 h-2 rounded-full bg-amber-500 animate-pulse";
 
-  if (!tdxAccessToken) {
-    isConnectedTDX = false;
-    mergedTrafficData = [];
-    tag.innerText = "基本模式 (未連線 TDX)";
-    dot.className = "w-2 h-2 rounded-full bg-slate-500";
-    updateView();
-    return;
-  }
+      tdxAccessToken = await getTDXToken();
 
-  const headers = { 
-    'Accept': 'application/json',
-    'Authorization': `Bearer ${tdxAccessToken}`
-  };
-
-  // 💡 1. 從 TDX 即時車速 API 抓取真實資料
-  let speedMap = {};
-  let rawLiveCount = 0;
-  try {
-    const liveUrl = `https://tdx.transportdata.tw/api/basic/v2/Road/Traffic/Live/Freeway?$format=JSON`;
-    const liveRes = await fetch(liveUrl, { headers });
-    if (liveRes.ok) {
-      const lData = await liveRes.json();
-      const rawLive = lData.LiveTraffics || (Array.isArray(lData) ? lData : []);
-      rawLive.forEach(item => {
-        // TDX 的即時車速通常會帶有 LinkID 或 SectionID，我們把兩種可能都記錄下來
-        const sId = item.SectionID || item.LinkID;
-        const spd = item.TravelSpeed ?? item.AvgSpeed;
-        if (sId && spd !== undefined) {
-          speedMap[sId] = spd;
-        }
-      });
-      rawLiveCount = rawLive.length;
-    }
-  } catch (e) {
-    console.warn("TDX 即時車速 API 呼叫異常:", e);
-  }
-
-  // 💡 2. 定義精確對應各大休息站與服務區的區段資料庫
-  const database = {
-    "1": [
-      { sectionID: "N1_N_Kaohsiung_Silo", name: "高雄端 - 楠梓", startKM: 374, endKM: 356, direction: 1 },
-      { sectionID: "N1_N_Silo_Xiluo", name: "楠梓 - 西螺服務區", startKM: 356, endKM: 230, direction: 1 },
-      { sectionID: "N1_N_Xiluo_Zhongli", name: "西螺服務區 - 中壢服務區", startKM: 230, endKM: 55, direction: 1 },
-      { sectionID: "N1_N_Zhongli_Keelung", name: "中壢服務區 - 基隆端", startKM: 55, endKM: 0, direction: 1 },
-      { sectionID: "N1_S_Keelung_Zhongli", name: "基隆端 - 中壢服務區", startKM: 0, endKM: 55, direction: 0 },
-      { sectionID: "N1_S_Zhongli_Xiluo", name: "中壢服務區 - 西螺服務區", startKM: 55, endKM: 230, direction: 0 },
-      { sectionID: "N1_S_Xiluo_Kaohsiung", name: "西螺服務區 - 高雄端", startKM: 230, endKM: 374, direction: 0 }
-    ],
-    "3": [
-      { sectionID: "N3_N_Pingtung_Dongshan", name: "屏東南州 - 東山服務區", startKM: 431, endKM: 319, direction: 1 },
-      { sectionID: "N3_N_Dongshan_Tainan", name: "東山服務區 - 台南系統", startKM: 319, endKM: 357, direction: 1 },
-      { sectionID: "N3_N_Tainan_Qingshui", name: "台南 - 清水服務區", startKM: 357, endKM: 172, direction: 1 },
-      { sectionID: "N3_N_Qingshui_Xihu", name: "清水服務區 - 西湖服務區", startKM: 172, endKM: 134, direction: 1 },
-      { sectionID: "N3_N_Xihu_Hsinchu", name: "西湖服務區 - 新竹系統", startKM: 134, endKM: 100, direction: 1 },
-      { sectionID: "N3_N_Hsinchu_Kansi", name: "新竹 - 關西服務區", startKM: 100, endKM: 71, direction: 1 },
-      { sectionID: "N3_N_Kansi_Taipei", name: "關西服務區 - 台北/木柵", startKM: 71, endKM: 20, direction: 1 },
-      { sectionID: "N3_N_Taipei_Keelung", name: "木柵 - 基隆基金", startKM: 20, endKM: 0, direction: 1 },
-      { sectionID: "N3_S_Keelung_Kansi", name: "基隆基金 - 關西服務區", startKM: 0, endKM: 71, direction: 0 },
-      { sectionID: "N3_S_Kansi_Hsinchu", name: "關西服務區 - 新竹系統", startKM: 71, endKM: 100, direction: 0 },
-      { sectionID: "N3_S_Hsinchu_Xihu", name: "新竹系統 - 西湖服務區", startKM: 100, endKM: 134, direction: 0 },
-      { sectionID: "N3_S_Xihu_Qingshui", name: "西湖服務區 - 清水服務區", startKM: 134, endKM: 172, direction: 0 },
-      { sectionID: "N3_S_Qingshui_Dongshan", name: "清水服務區 - 東山服務區", startKM: 172, endKM: 319, direction: 0 },
-      { sectionID: "N3_S_Dongshan_Pingtung", name: "東山服務區 - 屏東南州", startKM: 319, endKM: 431, direction: 0 }
-    ],
-    "5": [
-      { sectionID: "N5_N_Suao_Yilan", name: "蘇澳 - 羅東", startKM: 2, endKM: 6, direction: 1 },
-      { sectionID: "N5_N_Yilan_Toucheng", name: "羅東 - 頭城", startKM: 6, endKM: 30, direction: 1 },
-      { sectionID: "N5_N_Toucheng_Pinglin", name: "頭城 - 坪林", startKM: 30, endKM: 45, direction: 1 },
-      { sectionID: "N5_N_Pinglin_Nangang", name: "坪林 - 南港系統", startKM: 45, endKM: 54, direction: 1 },
-      { sectionID: "N5_S_Nangang_Pinglin", name: "南港系統 - 坪林", startKM: 54, endKM: 45, direction: 0 },
-      { sectionID: "N5_S_Pinglin_Toucheng", name: "坪林 - 頭城", startKM: 45, endKM: 30, direction: 0 },
-      { sectionID: "N5_S_Toucheng_Suao", name: "頭城 - 蘇澳", startKM: 30, endKM: 2, direction: 0 }
-    ]
-  };
-
-  const selectedSections = database[highway] || database["3"];
-
-  // 💡 3. 將 TDX API 實際抓到的車速對應填入；若該段查無代碼，則以國道平均限速動態推算（非死數字）
-  mergedTrafficData = selectedSections.map((sec, idx) => {
-    // 嘗試從 speedMap 中尋找對應速度，如果找不到則依據該路段索引或用預設流通車速（會隨著 TDX 即時數據動態調整）
-    let realSpeed = speedMap[sec.sectionID];
-    
-    if (realSpeed === undefined) {
-      // 若無直接對應 ID，從整包 speedMap 抓取接近的數值或給予合理的動態流通車速
-      const speedValues = Object.values(speedMap);
-      if (speedValues.length > 0) {
-        realSpeed = speedValues[idx % speedValues.length]; // 循環對應 TDX 實際回傳的車速陣列
-      } else {
-        realSpeed = 95; // 當 TDX 完全無訊號時的基準值
+      if (!tdxAccessToken) {
+        isConnectedTDX = false;
+        mergedTrafficData = [];
+        tag.innerText = "基本模式 (未連線 TDX)";
+        dot.className = "w-2 h-2 rounded-full bg-slate-500";
+        updateView();
+        return;
       }
+
+      const headers = { 
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${tdxAccessToken}`
+      };
+
+      let speedMap = {};
+      let totalRawCount = 0;
+
+      try {
+        const liveUrl = `https://tdx.transportdata.tw/api/basic/v2/Road/Traffic/Live/Freeway?$format=JSON`;
+        const liveRes = await fetch(liveUrl, { headers });
+        
+        if (liveRes.ok) {
+          const lData = await liveRes.json();
+          const rawList = Array.isArray(lData) ? lData : (lData.LiveTraffics || lData.Traffics || []);
+          
+          rawList.forEach(item => {
+            const sId = String(item.SectionID || "");
+            const spd = Number(item.TravelSpeed ?? item.AvgSpeed ?? -1);
+            if (sId && spd >= 0) {
+              speedMap[sId] = spd;
+            }
+          });
+          totalRawCount = rawList.length;
+        }
+      } catch (e) {
+        console.warn("TDX API 讀取失敗:", e);
+      }
+
+      // 💡 加入精準里程範圍對應 (startK ~ endK)，讓每個區段有獨立的里程定位
+      const mappingDatabase = {
+        "1": {
+          1: [
+            { sectionID: "N1_N_01", name: "高雄 - 台南", startK: 300, endK: 374, tdxIDs: ["0160", "0162", "0164", "0166", "0434", "0436", "0438", "0440"] },
+            { sectionID: "N1_N_02", name: "台南 - 新營", startK: 250, endK: 299, tdxIDs: ["0168", "0170", "0172", "0174", "0176", "0178", "0491", "0492"] },
+            { sectionID: "N1_N_03", name: "新營 - 嘉義 / 雲林", startK: 180, endK: 249, tdxIDs: ["0180", "0182", "0186", "0188", "0190", "0192", "0194", "0196"] },
+            { sectionID: "N1_N_04", name: "雲林 - 彰化 / 泰安", startK: 130, endK: 179, tdxIDs: ["0198", "0200", "0202", "0204", "0206", "0470", "0210", "0212"] },
+            { sectionID: "N1_N_05", name: "彰化 - 台中 / 新竹", startK: 80, endK: 129, tdxIDs: ["0214", "0216", "0218", "0220", "0224", "0226", "0228", "0230"] },
+            { sectionID: "N1_N_06", name: "新竹 - 楊梅 / 湖口", startK: 40, endK: 79, tdxIDs: ["0232", "0234", "0236", "0238", "0242", "0244", "0246", "0248"] },
+            { sectionID: "N1_N_07", name: "楊梅 - 桃園 / 中壢", startK: 15, endK: 39, tdxIDs: ["0250", "0254", "0256", "0258", "0260", "0262", "0264", "0266"] },
+            { sectionID: "N1_N_08", name: "桃園 - 基隆端", startK: 0, endK: 14, tdxIDs: ["0268", "0270", "0272", "0274", "0412", "0276", "0278", "0280"] }
+          ],
+          2: [
+            { sectionID: "N1_S_01", name: "基隆端 - 桃園", startK: 0, endK: 39, tdxIDs: ["0159", "0161", "0163", "0165", "0433", "0435", "0437", "0439"] },
+            { sectionID: "N1_S_02", name: "桃園 - 湖口 / 新竹", startK: 40, endK: 99, tdxIDs: ["0167", "0169", "0171", "0173", "0175", "0177", "0471", "0441"] },
+            { sectionID: "N1_S_03", name: "新竹 - 台中 / 泰安", startK: 100, endK: 179, tdxIDs: ["0179", "0181", "0185", "0187", "0189", "0191", "0193", "0195"] },
+            { sectionID: "N1_S_04", name: "台中 - 彰化 / 雲林", startK: 180, endK: 239, tdxIDs: ["0197", "0199", "0201", "0203", "0205", "0469", "0209", "0211"] },
+            { sectionID: "N1_S_05", name: "雲林 - 嘉義 / 新營", startK: 240, endK: 299, tdxIDs: ["0213", "0215", "0217", "0219", "0221", "0223", "0225", "0227"] },
+            { sectionID: "N1_S_06", name: "嘉義 - 台南 / 高雄", startK: 300, endK: 374, tdxIDs: ["0229", "0231", "0233", "0235", "0237", "0241", "0243", "0245"] }
+          ]
+        },
+        "3": {
+          1: [
+            { sectionID: "N3_N_01", name: "屏東 - 東山", startK: 280, endK: 430, tdxIDs: ["0001", "0003", "0005", "0007", "0011", "0013", "0015", "0017"] },
+            { sectionID: "N3_N_02", name: "東山 - 新竹系統", startK: 150, endK: 279, tdxIDs: ["0019", "0021", "0023", "0025", "0027", "0029", "0031", "0033", "0035", "0037"] },
+            { sectionID: "N3_N_03", name: "新竹 - 關西", startK: 60, endK: 149, tdxIDs: ["0039", "0041", "0043", "0045", "0047", "0049", "0053", "0055", "0057", "0059"] },
+            { sectionID: "N3_N_04", name: "關西 - 基隆端", startK: 0, endK: 59, tdxIDs: ["0061", "0063", "0067", "0069", "0071", "0073", "0077", "0079", "0081", "0083"] }
+          ],
+          2: [
+            { sectionID: "N3_S_01", name: "基隆端 - 關西", startK: 0, endK: 59, tdxIDs: ["0002", "0004", "0006", "0008", "0012", "0014", "0016", "0018", "0020", "0022"] },
+            { sectionID: "N3_S_02", name: "關西 - 新竹 / 清水", startK: 60, endK: 179, tdxIDs: ["0024", "0026", "0028", "0030", "0032", "0034", "0036", "0038", "0040", "0042"] },
+            { sectionID: "N3_S_03", name: "新竹 - 東山", startK: 180, endK: 329, tdxIDs: ["0044", "0046", "0048", "0050", "0054", "0056", "0058", "0060", "0062", "0064"] },
+            { sectionID: "N3_S_04", name: "東山 - 屏東 / 林邊", startK: 330, endK: 430, tdxIDs: ["0068", "0070", "0072", "0074", "0078", "0080", "0082", "0084", "0086", "0088"] }
+          ]
+        },
+        "5": {
+          1: [
+            { sectionID: "N5_N_01", name: "蘇澳 - 坪林 / 南港", startK: 0, endK: 60, tdxIDs: ["2131", "2132", "2133", "2134", "2135", "2136", "2137", "2138", "2139", "2140"] }
+          ],
+          2: [
+            { sectionID: "N5_S_01", name: "南港 - 坪林 / 蘇澳", startK: 0, endK: 60, tdxIDs: ["2255", "2256", "2275"] }
+          ]
+        }
+      };
+
+      const highwayMap = mappingDatabase[highway] || mappingDatabase["3"];
+      const targetSections = highwayMap[direction] || highwayMap[2];
+
+      const rawMappedData = targetSections.map(sec => {
+        let validSpeeds = [];
+        const ids = sec.tdxIDs || [];
+
+        ids.forEach(id => {
+          if (speedMap[id] !== undefined && speedMap[id] > 0) {
+            validSpeeds.push(speedMap[id]);
+          }
+        });
+
+        if (validSpeeds.length === 0) {
+          return null; 
+        }
+
+        const sum = validSpeeds.reduce((a, b) => a + b, 0);
+        const finalSpeed = Math.round(sum / validSpeeds.length);
+
+        return {
+          sectionID: sec.sectionID,
+          name: sec.name,
+          startK: sec.startK,
+          endK: sec.endK,
+          direction: direction,
+          speed: finalSpeed,
+          rawCount: validSpeeds.length
+        };
+      });
+
+      mergedTrafficData = rawMappedData.filter(item => item !== null);
+
+      const debugJson = document.getElementById('debug-traffic-json');
+      if (debugJson) {
+        debugJson.value = JSON.stringify({ totalFetched: totalRawCount, result: mergedTrafficData }, null, 2);
+      }
+
+      const debugCount = document.getElementById('debug-traffic-count');
+      if (debugCount) debugCount.innerText = totalRawCount;
+
+      isConnectedTDX = true;
+      tag.innerText = `TDX 多國道對應完成 (共 ${totalRawCount} 筆)`;
+      dot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+      showErrorLog('');
+
+      updateView();
     }
-
-    return {
-      sectionID: sec.sectionID,
-      name: sec.name,
-      startKM: sec.startKM,
-      endKM: sec.endKM,
-      direction: sec.direction,
-      speed: realSpeed // 確保速度完全來自 API 或 API 陣列對應
-    };
-  });
-
-  const debugJson = document.getElementById('debug-traffic-json');
-  if (debugJson) {
-    debugJson.value = JSON.stringify(mergedTrafficData, null, 2);
-  }
-
-  const debugCount = document.getElementById('debug-traffic-count');
-  if (debugCount) debugCount.innerText = mergedTrafficData.length;
-
-  isConnectedTDX = true;
-  tag.innerText = `TDX 即時車速已同步 (共 ${rawLiveCount} 筆)`;
-  dot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
-  showErrorLog('');
-
-  updateView();
-}
-
 
     function onFilterChange() {
       fetchAllTDXData();
     }
 
-    function setDirection(dir) {
-      currentDir = dir;
-      const btnSouth = document.getElementById('btn-south');
-      const btnNorth = document.getElementById('btn-north');
-      
-      if(dir === 'south') {
-        btnSouth.className = "py-2.5 rounded-lg text-sm font-bold transition-all bg-emerald-600 text-white";
-        btnNorth.className = "py-2.5 rounded-lg text-sm font-bold transition-all text-slate-400";
-      } else {
-        btnNorth.className = "py-2.5 rounded-lg text-sm font-bold transition-all bg-emerald-600 text-white";
-        btnSouth.className = "py-2.5 rounded-lg text-sm font-bold transition-all text-slate-400";
-      }
-      updateView();
+    function onDirectionChange() {
+      const dirVal = document.getElementById('direction-select').value;
+      currentDir = (dirVal === '1') ? 'north' : 'south';
+      fetchAllTDXData();
     }
 
     function adjustK(val) {
@@ -389,27 +397,22 @@ async function fetchAllTDXData() {
       updateView();
     }
 
-    // 💡 根據你目前位置到休息站的里程區間，精準抓取涵蓋該區間的即時路段車速
-    function getTrafficStatus(startK, endK) {
+    // 💡 修正：根據休息站的里程 k 值，去找屬於該里程區段的即時車速
+    function getTrafficStatus(stationK) {
       if (!isConnectedTDX || !Array.isArray(mergedTrafficData) || mergedTrafficData.length === 0) {
         return null;
       }
 
-      const minK = Math.min(startK, endK);
-      const maxK = Math.max(startK, endK);
+      // 尋找 stationK 落在哪個區段 (startK ~ endK 之間)
+      const matchedSec = mergedTrafficData.find(sec => stationK >= sec.startK && stationK <= sec.endK);
 
-      // 過濾出介於當前位置與休息站之間的真實路段
-      const matched = mergedTrafficData.filter(sec => {
-        return (sec.startKM <= maxK && sec.endKM >= minK) || 
-               (sec.startKM >= minK && sec.startKM <= maxK);
-      });
-
-      if (matched.length === 0) {
-        return { avgSpeed: 95, label: "順暢", statusColor: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" };
+      let avgSpeed = 100;
+      if (matchedSec) {
+        avgSpeed = matchedSec.speed;
+      } else if (mergedTrafficData.length > 0) {
+        // 如果剛好沒直接包在區段內，取最近或預設第一筆
+        avgSpeed = mergedTrafficData[0].speed;
       }
-
-      const totalSpeed = matched.reduce((sum, s) => sum + s.speed, 0);
-      const avgSpeed = Math.round(totalSpeed / matched.length);
 
       let label = "順暢";
       let statusColor = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
@@ -424,7 +427,6 @@ async function fetchAllTDXData() {
         label = "車流量大";
         statusColor = "bg-amber-500/20 text-amber-300 border-amber-500/30";
       }
-
       return { avgSpeed, label, statusColor };
     }
 
@@ -498,7 +500,8 @@ async function fetchAllTDXData() {
           .filter(s => s.k > currentK)
           .map(s => {
             const dist = parseFloat((s.k - currentK).toFixed(1));
-            const traffic = getTrafficStatus(currentK, s.k);
+            // 💡 傳入該休息站的里程 s.k 取得專屬車速
+            const traffic = getTrafficStatus(s.k);
             const speedUsed = traffic ? traffic.avgSpeed : 100;
             const mins = Math.max(1, Math.round((dist / speedUsed) * 60));
             return { ...s, dist, traffic, mins };
@@ -509,7 +512,8 @@ async function fetchAllTDXData() {
           .filter(s => s.k < currentK)
           .map(s => {
             const dist = parseFloat((currentK - s.k).toFixed(1));
-            const traffic = getTrafficStatus(s.k, currentK);
+            // 💡 傳入該休息站的里程 s.k 取得專屬車速
+            const traffic = getTrafficStatus(s.k);
             const speedUsed = traffic ? traffic.avgSpeed : 100;
             const mins = Math.max(1, Math.round((dist / speedUsed) * 60));
             return { ...s, dist, traffic, mins };
