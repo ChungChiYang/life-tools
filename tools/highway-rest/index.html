@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <!-- 針對手機最佳化，防止使用者縮放影響駕駛操作 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>國道休息站即時看板</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      touch-action: manipulation; /* 優化手機觸控反應 */
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col pb-10">
+
+  <!-- 頂部導覽列 (含返回首頁按鈕) -->
+  <header class="bg-slate-800 border-b border-slate-700 px-4 py-3 sticky top-0 z-50 flex items-center justify-between">
+    <a href="../../index.html" class="flex items-center text-slate-300 hover:text-white text-sm font-medium py-1 px-2 rounded-lg bg-slate-700/50 active:bg-slate-700">
+      <i class="fa-solid fa-chevron-left mr-1.5"></i> 工具清單
+    </a>
+    <h1 class="text-base font-bold text-emerald-400 flex items-center gap-2">
+      <i class="fa-solid fa-road"></i> 休息站即時看板
+    </h1>
+    <div class="w-16"></div> <!-- 保持中間對齊的占位區 -->
+  </header>
+
+  <main class="flex-1 max-w-xl w-full mx-auto p-3 sm:p-5 space-y-4">
+
+    <!-- 控制面板卡片 -->
+    <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700/80 shadow-xl space-y-4">
+      
+      <!-- 選擇國道與方向 (手機版自動滿寬按鈕) -->
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">國道編號</label>
+          <select id="highway-select" onchange="updateView()" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 text-base font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            <option value="1">國道 1 號 (中山高)</option>
+            <option value="3" selected>國道 3 號 (福爾摩沙高)</option>
+            <option value="5">國道 5 號 (蔣渭水高)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">行車方向</label>
+          <div class="grid grid-cols-2 gap-1 bg-slate-900 p-1 rounded-xl border border-slate-700">
+            <button id="btn-south" onclick="setDirection('south')" class="py-2.5 rounded-lg text-sm font-bold transition-all bg-emerald-600 text-white">南下</button>
+            <button id="btn-north" onclick="setDirection('north')" class="py-2.5 rounded-lg text-sm font-bold transition-all text-slate-400">北上</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 目前位置 K 數調整區 -->
+      <div>
+        <div class="flex justify-between items-center mb-1">
+          <label class="text-xs font-semibold text-slate-400">當前位置 (里程 K)</label>
+          <span class="text-xs text-slate-500">可直接輸入或按按鈕</span>
+        </div>
+        
+        <div class="flex items-center gap-2">
+          <span class="text-2xl font-black text-slate-500">K</span>
+          <input type="number" id="current-k" value="70" oninput="updateView()" class="w-full bg-slate-900 border border-slate-700 text-emerald-400 rounded-xl p-3 text-3xl font-black text-center focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <!-- 手機大按鈕微調列 -->
+        <div class="grid grid-cols-4 gap-2 mt-3">
+          <button onclick="adjustK(-5)" class="py-3 bg-slate-700/60 active:bg-slate-600 text-slate-200 font-bold rounded-xl text-base">-5k</button>
+          <button onclick="adjustK(-1)" class="py-3 bg-slate-700/60 active:bg-slate-600 text-slate-200 font-bold rounded-xl text-base">-1k</button>
+          <button onclick="adjustK(1)" class="py-3 bg-slate-700/60 active:bg-slate-600 text-slate-200 font-bold rounded-xl text-base">+1k</button>
+          <button onclick="adjustK(5)" class="py-3 bg-slate-700/60 active:bg-slate-600 text-slate-200 font-bold rounded-xl text-base">+5k</button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- 下一個休息站（超大號 Alert 區塊） -->
+    <section id="next-station-card" class="bg-emerald-600 text-white rounded-2xl p-5 shadow-lg relative overflow-hidden transition-all">
+      <!-- 內容將由 JS 動態渲染 -->
+    </section>
+
+    <!-- 後續休息站清單 -->
+    <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700/80 space-y-3">
+      <h3 class="text-sm font-bold text-slate-400 flex items-center gap-2">
+        <i class="fa-solid fa-list-ol"></i> 後續休息站預覽
+      </h3>
+      <div id="upcoming-list" class="space-y-2">
+        <!-- JS 動態產生 -->
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // 國道休息站資料集 (包含單向站點限制)
+    const stationsData = {
+      1: [
+        { name: "中壢服務區", k: 55, dir: "both" },
+        { name: "湖口服務區", k: 86, dir: "both" },
+        { name: "泰安服務區", k: 158, dir: "both" },
+        { name: "西螺服務區", k: 229, dir: "both" },
+        { name: "新營服務區", k: 284, dir: "both" },
+        { name: "仁德服務區", k: 316, dir: "both" }
+      ],
+      3: [
+        { name: "木柵休息站", k: 25, dir: "north" }, // 僅北上
+        { name: "關西服務區", k: 55, dir: "both" },
+        { name: "寶山休息站", k: 96, dir: "south" }, // 僅南下
+        { name: "西湖服務區", k: 135, dir: "both" },
+        { name: "清水服務區", k: 172, dir: "both" },
+        { name: "南投服務區", k: 224, dir: "both" },
+        { name: "古坑服務區", k: 269, dir: "both" },
+        { name: "東山服務區", k: 319, dir: "both" },
+        { name: "關廟服務區", k: 363, dir: "both" }
+      ],
+      5: [
+        { name: "石碇服務區", k: 4, dir: "both" },
+        { name: "蘇澳服務區", k: 54, dir: "both" }
+      ]
+    };
+
+    let currentDir = 'south';
+
+    function setDirection(dir) {
+      currentDir = dir;
+      const btnSouth = document.getElementById('btn-south');
+      const btnNorth = document.getElementById('btn-north');
+      
+      if(dir === 'south') {
+        btnSouth.className = "py-2.5 rounded-lg text-sm font-bold transition-all bg-emerald-600 text-white";
+        btnNorth.className = "py-2.5 rounded-lg text-sm font-bold transition-all text-slate-400";
+      } else {
+        btnNorth.className = "py-2.5 rounded-lg text-sm font-bold transition-all bg-emerald-600 text-white";
+        btnSouth.className = "py-2.5 rounded-lg text-sm font-bold transition-all text-slate-400";
+      }
+      updateView();
+    }
+
+    function adjustK(val) {
+      const input = document.getElementById('current-k');
+      let current = parseFloat(input.value) || 0;
+      input.value = Math.max(0, current + val);
+      updateView();
+    }
+
+    function updateView() {
+      const highway = document.getElementById('highway-select').value;
+      const currentK = parseFloat(document.getElementById('current-k').value) || 0;
+      
+      const list = stationsData[highway] || [];
+      
+      // 1. 過濾方向 (both 或 符合當前方向)
+      let validStations = list.filter(s => s.dir === 'both' || s.dir === currentDir);
+      
+      // 2. 根據南下/北上計算剩餘里程與排序
+      let upcoming = [];
+      if(currentDir === 'south') {
+        // 南下：K數增加，找 K > currentK
+        upcoming = validStations
+          .filter(s => s.k > currentK)
+          .map(s => ({ ...s, dist: (s.k - currentK).toFixed(1) }))
+          .sort((a,b) => a.k - b.k);
+      } else {
+        // 北上：K數減少，找 K < currentK
+        upcoming = validStations
+          .filter(s => s.k < currentK)
+          .map(s => ({ ...s, dist: (currentK - s.k).toFixed(1) }))
+          .sort((a,b) => b.k - a.k);
+      }
+
+      // 渲染下一個休息站 Alert 卡片
+      const card = document.getElementById('next-station-card');
+      if (upcoming.length > 0) {
+        const next = upcoming[0];
+        const mins = Math.round((next.dist / 100) * 60); // 假設時速 100km/h
+        card.innerHTML = `
+          <div class="text-xs font-bold uppercase tracking-wider text-emerald-200">Next Rest Area • 即將到達</div>
+          <div class="text-3xl font-black mt-1 mb-2">${next.name} <span class="text-lg font-normal text-emerald-100">(${next.k}K)</span></div>
+          <div class="flex items-baseline gap-3">
+            <div><span class="text-4xl font-extrabold">${next.dist}</span> <span class="text-sm">KM</span></div>
+            <div class="text-slate-900 bg-white/90 px-3 py-1 rounded-full text-xs font-bold">預估 ~${mins} 分鐘</div>
+          </div>
+        `;
+        card.className = "bg-emerald-600 text-white rounded-2xl p-5 shadow-lg relative overflow-hidden transition-all";
+      } else {
+        card.innerHTML = `
+          <div class="text-lg font-bold">前方方向已無休息站</div>
+          <div class="text-xs text-slate-200 mt-1">您已通過該國道當前方向的所有休息站。</div>
+        `;
+        card.className = "bg-slate-700 text-white rounded-2xl p-5 shadow-lg transition-all";
+      }
+
+      // 渲染後續清單
+      const listContainer = document.getElementById('upcoming-list');
+      if(upcoming.length > 1) {
+        listContainer.innerHTML = upcoming.slice(1).map(s => `
+          <div class="flex justify-between items-center p-3 bg-slate-900/60 rounded-xl border border-slate-700/50">
+            <div>
+              <div class="font-bold text-white">${s.name}</div>
+              <div class="text-xs text-slate-400">${s.k} K</div>
+            </div>
+            <div class="text-right">
+              <div class="text-emerald-400 font-extrabold">${s.dist} km</div>
+              <div class="text-xs text-slate-500">~${Math.round((s.dist/100)*60)} 分鐘</div>
+            </div>
+          </div>
+        `).join('');
+      } else if(upcoming.length === 1) {
+        listContainer.innerHTML = `<div class="text-xs text-slate-500 text-center py-2">無更多後續休息站</div>`;
+      } else {
+        listContainer.innerHTML = `<div class="text-xs text-slate-500 text-center py-2">--</div>`;
+      }
+    }
+
+    // 初始化執行
+    updateView();
+  </script>
+</body>
+</html>
