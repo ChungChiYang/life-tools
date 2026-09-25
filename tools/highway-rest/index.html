@@ -138,12 +138,7 @@
         { name: "蘇澳服務區", k: 54, dir: "both", lat: 24.6062, lng: 121.8262 }
       ]
     };
-
-    let currentDir = 'south';
-    let tdxAccessToken = '';
-    let isConnectedTDX = false;
-    let mergedTrafficData = []; 
-
+    
     document.addEventListener("DOMContentLoaded", () => {
       const savedId = localStorage.getItem('tdx_client_id') || '';
       const savedSecret = localStorage.getItem('tdx_client_secret') || '';
@@ -151,7 +146,15 @@
       if (savedSecret) document.getElementById('tdx-client-secret').value = savedSecret;
 
       fetchAllTDXData();
+      
+      // 💡 網頁一載入就自動執行一次 GPS 緯度換算 K 數
+      setTimeout(getLocationOnce, 500); 
     });
+
+    let currentDir = 'south';
+    let tdxAccessToken = '';
+    let isConnectedTDX = false;
+    let 
 
     function showErrorLog(msg) {
       const logDiv = document.getElementById('tdx-error-log');
@@ -334,45 +337,37 @@
         return;
       }
 
-      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 定位中...`;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 緯度換算 K 數中...`;
       
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const userLat = position.coords.latitude;
-          const userLng = position.coords.longitude;
-          
-          // 💡 抓取當前選擇的國道編號 (1, 3, 5)
           const highway = document.getElementById('highway-select').value;
-          const list = stationsData[highway] || [];
+          
+          let estimatedK = 0;
 
-          // 嚴格依據該國道的休息站清單來計算距離
-          let sortedByDist = [...list].map(s => ({
-            ...s,
-            dist: getDistanceInKm(userLat, userLng, s.lat, s.lng)
-          })).sort((a, b) => a.dist - b.dist);
-
-          if (sortedByDist.length >= 2) {
-            const s1 = sortedByDist[0];
-            const s2 = sortedByDist[1];
-
-            // 根據該國道所選的休息站經緯度相對位置推估當前 K 數
-            let estimatedK = Math.round((s1.k + s2.k) / 2);
-            
-            if (userLat < s1.lat) {
-              estimatedK = s1.k - 5; 
-            } else {
-              estimatedK = s1.k + 5; 
-            }
-
-            estimatedK = Math.max(0, estimatedK);
-
-            document.getElementById('current-k').value = estimatedK;
-            updateView();
-            btn.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> 已切換至國道 ${highway} 估算 K 數`;
-          } else {
-            btn.innerHTML = `<i class="fa-solid fa-location-crosshairs"></i> GPS 自動對應 K 數`;
+          // 💡 根據不同國道的緯度與 K 數線性對應公式直接精準換算
+          if (highway === "1") {
+            // 國道 1 號：北端約 25.13°N (0K) -> 南端約 22.58°N (374K)
+            // 緯度每差 1 度，大約等於 146 K 左右
+            estimatedK = Math.round((25.13 - userLat) * 146.6);
+          } else if (highway === "3") {
+            // 國道 3 號：北端約 25.22°N (0K) -> 南端約 22.44°N (430K)
+            // 緯度每差 1 度，大約等於 154 K 左右
+            estimatedK = Math.round((25.22 - userLat) * 154.6);
+          } else if (highway === "5") {
+            // 國道 5 號：北端約 25.05°N (0K) -> 南端約 24.60°N (54K)
+            estimatedK = Math.round((25.05 - userLat) * 120.0);
           }
 
+          // 限制範圍不超過該國道極限，且不能小於 0
+          estimatedK = Math.max(0, estimatedK);
+
+          // 賦值並更新畫面
+          document.getElementById('current-k').value = estimatedK;
+          updateView();
+
+          btn.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> 已定位 (${estimatedK}K)`;
           setTimeout(() => {
             btn.innerHTML = `<i class="fa-solid fa-location-crosshairs"></i> GPS 自動對應 K 數`;
           }, 3000);
@@ -384,6 +379,7 @@
         { timeout: 8000, enableHighAccuracy: true }
       );
     }
+
 
 
 
