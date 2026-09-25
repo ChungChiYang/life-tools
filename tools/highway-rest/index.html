@@ -340,37 +340,35 @@
         (position) => {
           const userLat = position.coords.latitude;
           const userLng = position.coords.longitude;
+          
+          // 💡 抓取當前選擇的國道編號 (1, 3, 5)
           const highway = document.getElementById('highway-select').value;
           const list = stationsData[highway] || [];
 
-          // 找出離你最近的前後兩個休息站來進行座標比例推算
+          // 嚴格依據該國道的休息站清單來計算距離
           let sortedByDist = [...list].map(s => ({
             ...s,
             dist: getDistanceInKm(userLat, userLng, s.lat, s.lng)
           })).sort((a, b) => a.dist - b.dist);
 
           if (sortedByDist.length >= 2) {
-            // 抓取最近的兩個休息站來做線性內插，精算當前 K 數
             const s1 = sortedByDist[0];
             const s2 = sortedByDist[1];
 
-            // 簡單透過座標比例估算當前 K 數
-            let estimatedK = Math.round((s1.k + s2.k) / 2); // 預設折衷
+            // 根據該國道所選的休息站經緯度相對位置推估當前 K 數
+            let estimatedK = Math.round((s1.k + s2.k) / 2);
             
-            // 如果能用經緯度前後夾擠會更準，這裡直接以最近的休息站為基準，結合方向微調
-            // 讓它呈現你當下的實際大約 K 數，而不是直接等於休息站 K 數
             if (userLat < s1.lat) {
-              estimatedK = s1.k - 5; // 如果在它後面一點
+              estimatedK = s1.k - 5; 
             } else {
-              estimatedK = s1.k + 5; // 如果在它前面一點
+              estimatedK = s1.k + 5; 
             }
 
-            // 確保不會小於 0
             estimatedK = Math.max(0, estimatedK);
 
             document.getElementById('current-k').value = estimatedK;
             updateView();
-            btn.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> 已取得當前位置`;
+            btn.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> 已切換至國道 ${highway} 估算 K 數`;
           } else {
             btn.innerHTML = `<i class="fa-solid fa-location-crosshairs"></i> GPS 自動對應 K 數`;
           }
@@ -386,6 +384,7 @@
         { timeout: 8000, enableHighAccuracy: true }
       );
     }
+
 
 
     function getDistanceInKm(lat1, lon1, lat2, lon2) {
