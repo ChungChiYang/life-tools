@@ -428,24 +428,32 @@
     function getTrafficStatusByK(stationK) {
       if (!isConnectedTDX || mergedTrafficData.length === 0) return null;
       const matched = mergedTrafficData.find(sec => stationK >= sec.startK && stationK <= sec.endK) || mergedTrafficData[0];
-      const checkSpeed = matched.minSpeed; // 採用局部最低速防呆
+      
+      const avgSpd = matched.speed;
+      const minSpd = matched.minSpeed;
 
       let label = "順暢";
       let statusColor = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
 
-      if (checkSpeed < 40) {
-        label = "局部嚴重壅塞";
+      // 💡 改進邏輯：優先看整段平均速度，避免被單一極端慢速（如匝道回堵）誤導
+      if (avgSpd < 40) {
+        label = "路段壅塞";
         statusColor = "bg-purple-500/20 text-purple-300 border-purple-500/30";
-      } else if (checkSpeed < 60) {
-        label = "局部車多壅塞";
+      } else if (avgSpd < 60) {
+        label = "車多擁擠";
         statusColor = "bg-red-500/20 text-red-300 border-red-500/30";
-      } else if (checkSpeed < 80) {
-        label = "局部車流量大";
+      } else if (avgSpd < 75) {
+        label = "車多順暢";
         statusColor = "bg-amber-500/20 text-amber-300 border-amber-500/30";
+      } else if (minSpd < 40) {
+        // 如果平均很快，但局部有低速點，給個溫和的提示
+        label = "局部車多";
+        statusColor = "bg-blue-500/20 text-blue-300 border-blue-500/30";
       }
 
-      return { avgSpeed: matched.speed, minSpeed: matched.minSpeed, label, statusColor };
+      return { avgSpeed: avgSpd, minSpeed: minSpd, label, statusColor };
     }
+
 
     function updateView() {
       const highway = document.getElementById('highway-select').value;
