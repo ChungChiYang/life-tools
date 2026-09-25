@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>國道休息站即時看板 (精準里程對應版)</title>
+  <title>國道休息站即時看板 (局部最低速警示版)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
@@ -43,7 +43,7 @@
     <!-- Debug 面板 -->
     <section id="debug-console" class="hidden bg-slate-950 border-2 border-amber-500/80 rounded-2xl p-3 space-y-3 font-mono text-[11px] text-slate-300">
       <div class="font-bold text-amber-400 flex justify-between border-b border-slate-800 pb-1">
-        <span>整合靜態與即時路況資料監測</span>
+        <span>整合靜態與即時路況資料監測 (含最低速抓取)</span>
         <button onclick="fetchAllTDXData()" class="underline text-amber-300">手動重抓 API</button>
       </div>
 
@@ -60,7 +60,7 @@
         <span class="text-[10px] bg-slate-700 px-2 py-0.5 rounded text-slate-300">點擊收合/展開</span>
       </summary>
       <div class="mt-3 space-y-2">
-        <p class="text-slate-400">請確認填入正確的 Client ID 與 Client Secret，以取得即時國道車速與動態預估抵達時間。</p>
+        <p class="text-slate-400">請確認填入正確的 Client ID 與 Client Secret，以取得即時國道車速與局部最低速警示。</p>
         <div>
           <label class="block text-[11px] mb-1">Client ID:</label>
           <input type="text" id="tdx-client-id" placeholder="填入 Client ID" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white font-mono">
@@ -80,7 +80,6 @@
       <div class="grid grid-cols-2 gap-2">
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1">國道編號</label>
-          <!-- 💡 這裡將 selected 改到國道 1 號 -->
           <select id="highway-select" onchange="onFilterChange()" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 text-base font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none">
             <option value="1" selected>國道 1 號 (中山高)</option>
             <option value="3">國道 3 號 (福爾摩沙高)</option>
@@ -106,8 +105,7 @@
         
         <div class="flex items-center gap-2">
           <span class="text-2xl font-black text-slate-500">K</span>
-          <!-- 💡 這裡將預設里程從 70 改為 91 (國道1號適合的預設起點) -->
-          <input type="number" id="current-k" value="91" oninput="updateView()" class="w-full bg-slate-900 border border-slate-700 text-emerald-400 rounded-xl p-3 text-3xl font-black text-center focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          <input type="number" id="current-k" value="40" oninput="updateView()" class="w-full bg-slate-900 border border-slate-700 text-emerald-400 rounded-xl p-3 text-3xl font-black text-center focus:ring-2 focus:ring-emerald-500 focus:outline-none">
         </div>
 
         <div class="grid grid-cols-4 gap-2 mt-3">
@@ -239,7 +237,7 @@
     async function fetchAllTDXData() {
       const highway = document.getElementById('highway-select').value;
       const directionSelect = document.getElementById('direction-select');
-      const direction = directionSelect ? Number(directionSelect.value) : 2; // 1: 北上, 2: 南下
+      const direction = directionSelect ? Number(directionSelect.value) : 2; 
 
       const tag = document.getElementById('traffic-source-tag');
       const dot = document.getElementById('traffic-status-dot');
@@ -340,7 +338,7 @@
         const ids = sec.tdxIDs || [];
 
         ids.forEach(id => {
-          if (speedMap[id] !== undefined && speedMap[id] > 0) {
+          if (speedMap[id] !== undefined && speedMap[id] >= 0) {
             validSpeeds.push(speedMap[id]);
           }
         });
@@ -350,7 +348,8 @@
         }
 
         const sum = validSpeeds.reduce((a, b) => a + b, 0);
-        const finalSpeed = Math.round(sum / validSpeeds.length);
+        const avgSpeed = Math.round(sum / validSpeeds.length);
+        const minSpeed = Math.min(...validSpeeds); // 💡 額外抓出該區段的局部最低速
 
         return {
           sectionID: sec.sectionID,
@@ -358,7 +357,8 @@
           startK: sec.startK,
           endK: sec.endK,
           direction: direction,
-          speed: finalSpeed,
+          speed: avgSpeed,
+          minSpeed: minSpeed, // 💡 儲存最低速
           rawCount: validSpeeds.length
         };
       });
@@ -374,7 +374,7 @@
       if (debugCount) debugCount.innerText = totalRawCount;
 
       isConnectedTDX = true;
-      tag.innerText = `TDX 多國道對應完成 (共 ${totalRawCount} 筆)`;
+      tag.innerText = `TDX 最低速偵測已啟用 (共 ${totalRawCount} 筆)`;
       dot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
       showErrorLog('');
 
@@ -406,26 +406,34 @@
       const matchedSec = mergedTrafficData.find(sec => stationK >= sec.startK && stationK <= sec.endK);
 
       let avgSpeed = 100;
+      let minSpeed = 100;
+      
       if (matchedSec) {
         avgSpeed = matchedSec.speed;
+        minSpeed = matchedSec.minSpeed;
       } else if (mergedTrafficData.length > 0) {
         avgSpeed = mergedTrafficData[0].speed;
+        minSpeed = mergedTrafficData[0].minSpeed;
       }
+
+      // 💡 為了避免被平均數騙，我們改用「局部最低速」來作為狀態燈號與預估基準的依據
+      const checkSpeed = minSpeed; 
 
       let label = "順暢";
       let statusColor = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
 
-      if (avgSpeed < 40) {
-        label = "嚴重壅塞";
+      if (checkSpeed < 40) {
+        label = "局部嚴重壅塞";
         statusColor = "bg-purple-500/20 text-purple-300 border-purple-500/30";
-      } else if (avgSpeed < 60) {
-        label = "車多壅塞";
+      } else if (checkSpeed < 60) {
+        label = "局部車多壅塞";
         statusColor = "bg-red-500/20 text-red-300 border-red-500/30";
-      } else if (avgSpeed < 80) {
-        label = "車流量大";
+      } else if (checkSpeed < 80) {
+        label = "局部車流量大";
         statusColor = "bg-amber-500/20 text-amber-300 border-amber-500/30";
       }
-      return { avgSpeed, label, statusColor };
+
+      return { avgSpeed, minSpeed, checkSpeed, label, statusColor };
     }
 
     function getLocationOnce() {
@@ -499,7 +507,8 @@
           .map(s => {
             const dist = parseFloat((s.k - currentK).toFixed(1));
             const traffic = getTrafficStatus(s.k);
-            const speedUsed = traffic ? traffic.avgSpeed : 100;
+            // 💡 預估時間改用「最低速」來計算，以策安全防呆
+            const speedUsed = traffic ? traffic.minSpeed : 100;
             const mins = Math.max(1, Math.round((dist / speedUsed) * 60));
             return { ...s, dist, traffic, mins };
           })
@@ -510,7 +519,7 @@
           .map(s => {
             const dist = parseFloat((currentK - s.k).toFixed(1));
             const traffic = getTrafficStatus(s.k);
-            const speedUsed = traffic ? traffic.avgSpeed : 100;
+            const speedUsed = traffic ? traffic.minSpeed : 100;
             const mins = Math.max(1, Math.round((dist / speedUsed) * 60));
             return { ...s, dist, traffic, mins };
           })
@@ -522,11 +531,16 @@
         const next = upcoming[0];
         
         const trafficBadge = next.traffic ? `
-          <span class="px-2.5 py-1 text-xs font-bold rounded-full border ${next.traffic.statusColor}">
-            ${next.traffic.label} (${next.traffic.avgSpeed} km/h)
-          </span>
+          <div class="flex flex-col items-end gap-1">
+            <span class="px-2.5 py-1 text-xs font-bold rounded-full border ${next.traffic.statusColor}">
+              ${next.traffic.label}
+            </span>
+            <span class="text-[11px] text-emerald-100 font-mono">
+              均速 ${next.traffic.avgSpeed} / <strong class="text-white underline">最低 ${next.traffic.minSpeed} km/h</strong>
+            </span>
+          </div>
         ` : `
-          <span class="px-2.5 py-1 text-xs font-medium rounded-full bg-slate-700/80 text-slate-300 border border-slate-600">
+          <span class="px-2.5 py-1 text-xs font-medium rounded-full bg-slate-700/85 text-slate-300 border border-slate-600">
             未取得即時車速
           </span>
         `;
@@ -543,7 +557,7 @@
           <div class="flex items-baseline gap-3 my-2">
             <div><span class="text-4xl font-extrabold">${next.dist}</span> <span class="text-sm">KM</span></div>
             <div class="text-slate-900 bg-white/90 px-3 py-1 rounded-full text-xs font-bold">
-              ${next.traffic ? `即時路況估計 ~${next.mins} 分鐘` : `以速限100km/h估算 ~${next.mins} 分鐘`}
+              ${next.traffic ? `即時路況保守估計 ~${next.mins} 分鐘` : `以速限100km/h估算 ~${next.mins} 分鐘`}
             </div>
           </div>
         `;
@@ -560,16 +574,21 @@
       if(upcoming.length > 1) {
         listContainer.innerHTML = upcoming.slice(1).map(s => {
           const tTag = s.traffic ? `
-            <span class="text-[10px] px-2 py-0.5 rounded border ${s.traffic.statusColor}">
-              ${s.traffic.label} (${s.traffic.avgSpeed} km/h)
-            </span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[10px] px-2 py-0.5 rounded border ${s.traffic.statusColor}">
+                ${s.traffic.label}
+              </span>
+              <span class="text-[10px] text-slate-400 font-mono">
+                (最慢 <strong class="text-slate-200">${s.traffic.minSpeed} km/h</strong>)
+              </span>
+            </div>
           ` : `<span class="text-[10px] px-2 py-0.5 rounded border border-slate-700 bg-slate-800 text-slate-400">速限 100km/h 估算</span>`;
 
           return `
             <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-700/50 space-y-2">
               <div class="flex justify-between items-center">
-                <div class="font-bold text-white flex items-center gap-2">
-                  ${s.name}
+                <div class="font-bold text-white flex flex-col gap-1">
+                  <span>${s.name}</span>
                   ${tTag}
                 </div>
                 <div class="text-right">
