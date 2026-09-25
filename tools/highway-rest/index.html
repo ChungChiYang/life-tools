@@ -139,6 +139,11 @@
       ]
     };
     
+    let currentDir = 'south';
+    let tdxAccessToken = '';
+    let isConnectedTDX = false;
+    let mergedTrafficData = [];
+    
     document.addEventListener("DOMContentLoaded", () => {
       const savedId = localStorage.getItem('tdx_client_id') || '';
       const savedSecret = localStorage.getItem('tdx_client_secret') || '';
@@ -151,10 +156,6 @@
       setTimeout(getLocationOnce, 500); 
     });
 
-    let currentDir = 'south';
-    let tdxAccessToken = '';
-    let isConnectedTDX = false;
-    let 
 
     function showErrorLog(msg) {
       const logDiv = document.getElementById('tdx-error-log');
