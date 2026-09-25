@@ -466,10 +466,14 @@
         upcoming = validStations
           .filter(s => s.k > currentK)
           .map(s => {
-            const dist = parseFloat((s.k - currentK).toFixed(1)); // 💡 嚴格用國道 K 數差計算距離，絕不亂跳
+            const dist = parseFloat((s.k - currentK).toFixed(1)); // 剩餘公裡數
             const traffic = getTrafficStatusByK(s.k);
-            const speedUsed = traffic ? traffic.minSpeed : 100;
+            
+            // 💡 修正：直接用該點取得的平均車速來算時間 (不累積加總多個區段)
+            // 如果沒抓到路況，預設用時速 90~100 公里去跑
+            const speedUsed = (traffic && traffic.avgSpeed > 20) ? traffic.avgSpeed : 90;
             const mins = Math.max(1, Math.round((dist / speedUsed) * 60));
+            
             return { ...s, dist, traffic, mins };
           })
           .sort((a,b) => a.k - b.k);
@@ -477,14 +481,17 @@
         upcoming = validStations
           .filter(s => s.k < currentK)
           .map(s => {
-            const dist = parseFloat((currentK - s.k).toFixed(1)); // 💡 嚴格用國道 K 數差計算距離
+            const dist = parseFloat((currentK - s.k).toFixed(1));
             const traffic = getTrafficStatusByK(s.k);
-            const speedUsed = traffic ? traffic.minSpeed : 100;
+            
+            const speedUsed = (traffic && traffic.avgSpeed > 20) ? traffic.avgSpeed : 90;
             const mins = Math.max(1, Math.round((dist / speedUsed) * 60));
+            
             return { ...s, dist, traffic, mins };
           })
           .sort((a,b) => b.k - a.k);
       }
+
 
       const card = document.getElementById('next-station-card');
       const listContainer = document.getElementById('upcoming-list');
