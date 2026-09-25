@@ -338,30 +338,58 @@
         return;
       }
 
-      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 緯度換算 K 數中...`;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 精準計算中...`;
       
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const userLat = position.coords.latitude;
           const highway = document.getElementById('highway-select').value;
-          
-          let estimatedK = 0;
+          const list = stationsData[highway] || [];
 
-          // 💡 根據不同國道的緯度與 K 數線性對應公式直接精準換算
-          if (highway === "1") {
-            // 國道 1 號：北端約 25.13°N (0K) -> 南端約 22.58°N (374K)
-            // 緯度每差 1 度，大約等於 146 K 左右
-            estimatedK = Math.round((25.13 - userLat) * 146.6);
-          } else if (highway === "3") {
-            // 國道 3 號：北端約 25.22°N (0K) -> 南端約 22.44°N (430K)
-            // 緯度每差 1 度，大約等於 154 K 左右
-            estimatedK = Math.round((25.22 - userLat) * 154.6);
-          } else if (highway === "5") {
-            // 國道 5 號：北端約 25.05°N (0K) -> 南端約 24.60°N (54K)
-            estimatedK = Math.round((25.05 - userLat) * 120.0);
+          if (list.length < 2) {
+            alert("該國道休息站資料不足");
+            btn.innerHTML = `<i class="fa-solid fa-location-crosshairs"></i> GPS 自動對應 K 數`;
+            return;
           }
 
-          // 限制範圍不超過該國道極限，且不能小於 0
+          // 依照緯度排序休息站（緯度由高到低，即由北到南）
+          // 國道通常北邊緯度高、K數小；南邊緯度低、K數大
+          let sortedStations = [...list].sort((a, b) => b.lat - a.lat);
+
+          let estimatedK = 40; // 預設值
+
+          // 判斷你在哪兩個休息站之間
+          if (userLat >= sortedStationLat(sortedStations[0])) {
+            // 比最北邊的休息站還北邊，用前段比例推算
+            const s1 = sortedStations[0];
+            const s2 = sortedStations[1];
+            let ratio = (userLat - s2.lat) / (s1.lat - s2.lat);
+            estimatedK = Math.round(s2.k - ratio * (s2.k - s1.k));
+          } else if (userLat <= sortedStations[sortedStations.length - 1].lat) {
+            // 比最南邊的休息站還南邊
+            const s1 = sortedStations[sortedStations.length - 2];
+            const s2 = sortedStations[sortedStations.length - 1];
+            let ratio = (userLat - s2.lat) / (s1.lat - s2.lat);
+            estimatedK = Math.round(s2.k + (1 - ratio) * (s2.k - s1.k));
+          } else {
+            // 夾在中間的某兩個休息站之間
+            for (let i = 0; i < sortedStations.length - 1; i++) {
+              let northStation = sortedStations[i]; // 比較北 (緯度高, K數小)
+              let southStation = sortedStations[i+1]; // 比較南 (緯度低, K數大)
+
+              if (userLat <= northStation.lat && userLat >= southStation.lat) {
+                // 進行線性內插計算精準 K 數
+                let totalLatSpan = northStation.lat - southStation.lat;
+                let userLatSpan = northStation.lat - userLat;
+                let fraction = userLatSpan / totalLatSpan;
+                
+                let totalKSpan = southStation.k - northStation.k;
+                estimatedK = Math.round(northStation.k + (fraction * totalKSpan));
+                break;
+              }
+            }
+          }
+
           estimatedK = Math.max(0, estimatedK);
 
           // 賦值並更新畫面
@@ -381,7 +409,10 @@
       );
     }
 
-
+    // 輔助函式避免作用域混淆
+    function sortedStationLat(s) {
+      return s.lat;
+    }
 
 
     function getDistanceInKm(lat1, lon1, lat2, lon2) {
