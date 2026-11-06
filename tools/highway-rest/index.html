@@ -130,6 +130,8 @@
 
   <script>
     // ============ 設定 ============
+    const SPEED_CAP = 100;                    // 計算時間時的車速上限 (km/h)，避免即時速度偏樂觀
+    const STATION_BUFFER_MIN = 3;             // 下匝道、進場、停車的緩衝分鐘數（寧可多估）
     const DEFAULT_SPEED = 90;                 // 沒有即時速度時的估算車速 (km/h)
     const LIVE_TTL_MS = 3 * 60 * 1000;        // 路況快取：3 分鐘內重開頁面不會重抓
     const SECTION_TTL_MS = 7 * 24 * 3600 * 1000; // 路段靜態資料快取 7 天
@@ -185,6 +187,7 @@
       liveOk: false,
       rawSample: null,
       unknownDir: 0,
+      invalidCount: 0,
       lastError: ''
     };
 
@@ -324,27 +327,28 @@
     async function loadLive(force) {
       const c = readJSON(KEY_LIVE);
       if (c && !force && Date.now() - c.t < LIVE_TTL_MS) {
-        state.live = c.speeds; state.liveFetchedAt = c.t; state.dataTime = c.dt; state.liveOk = true;
+        state.live = c.speeds; state.liveFetchedAt = c.t; state.dataTime = c.dt; state.liveOk = true; state.invalidCount = c.inv || 0;
         return 'cache';
       }
       if (force && c && Date.now() - c.t < MIN_FORCE_GAP_MS) {
-        state.live = c.speeds; state.liveFetchedAt = c.t; state.dataTime = c.dt; state.liveOk = true;
+        state.live = c.speeds; state.liveFetchedAt = c.t; state.dataTime = c.dt; state.liveOk = true; state.invalidCount = c.inv || 0;
         return 'throttled';
       }
       const data = await tdxGet(LIVE_URL);
       const arr = Array.isArray(data) ? data : (data.LiveTraffics || data.Traffics || []);
       const speeds = {};
-      let latest = null;
+      let latest = null, invalid = 0;
       arr.forEach(item => {
         const id = String(item.SectionID || '');
         const spd = Number(item.TravelSpeed ?? item.AvgSpeed ?? -1);
         if (id && spd > 0) speeds[id] = spd;
+        else if (id) invalid++;
         const dt = item.DataCollectTime;
         if (dt && (!latest || dt > latest)) latest = dt;
       });
       if (!latest) latest = data.SrcUpdateTime || data.UpdateTime || null;
-      state.live = speeds; state.liveFetchedAt = Date.now(); state.dataTime = latest; state.liveOk = true;
-      writeJSON(KEY_LIVE, { t: state.liveFetchedAt, speeds, dt: latest });
+      state.live = speeds; state.liveFetchedAt = Date.now(); state.dataTime = latest; state.liveOk = true; state.invalidCount = invalid;
+      writeJSON(KEY_LIVE, { t: state.liveFetchedAt, speeds, dt: latest, inv: invalid });
       return 'fetched';
     }
 
@@ -394,7 +398,11 @@
         '路段總數 (國道1/3/5): ' + state.sections.length,
         '無法判斷方向的路段數: ' + state.unknownDir,
         '目前所選國道/方向的路段數: ' + secs.length + '，其中有即時速度: ' + secs.filter(s => s.speed).length,
-        '即時速度總筆數: ' + Object.keys(state.live).length,
+        '即時速度總筆數: ' + Object.keys(state.live).length + '（速度無效或為 0 的筆數: ' + state.invalidCount + '）',
+        '各國道/方向「有速度 / 路段數」: ' + ['1', '3', '5'].map(r => ['south', 'north'].map(d => {
+          const l = state.sections.filter(x => x.road === r && x.dir === d);
+          return '國' + r + (d === 'south' ? '南' : '北') + ' ' + l.filter(x => state.live[x.id]).length + '/' + l.length;
+        }).join('、')).join('；'),
         '路況資料時間: ' + (state.dataTime || '無'),
         '最近錯誤: ' + (state.lastError || '無'),
         '--- 路段原始資料範例 (第一筆) ---',
@@ -430,16 +438,34 @@
     }
 
     // ============ 路況計算 ============
+    // 缺速度的路段，用前後最近、有真實速度的路段補（兩側都有就取平均）。
+    // 這樣在塞車時，缺資料的路段不會被當成 90 km/h 順暢通過。
+    function fillGaps(secs) {
+      const out = secs.map(x => ({ ...x }));
+      for (let i = 0; i < out.length; i++) {
+        if (out[i].speed) continue;
+        let p = i - 1; while (p >= 0 && !secs[p].speed) p--;
+        let n = i + 1; while (n < out.length && !secs[n].speed) n++;
+        const prev = p >= 0 ? secs[p].speed : null;
+        const next = n < out.length ? secs[n].speed : null;
+        if (prev && next) { out[i].speed = Math.round((prev + next) / 2); out[i].est = true; }
+        else if (prev || next) { out[i].speed = prev || next; out[i].est = true; }
+      }
+      return out;
+    }
+
     function activeSections() {
       const hw = $('highway-select').value;
-      return state.sections
+      const base = state.sections
         .filter(s => s.road === hw && s.dir === currentDir)
         .map(s => ({ id: s.id, lo: s.lo, hi: s.hi, speed: state.live[s.id] ?? null }))
         .sort((a, b) => a.lo - b.lo);
+      return fillGaps(base);
     }
 
     // 計算 [a, b] 這段里程 (a < b) 的行車時間：逐路段「長度 ÷ 該段速度」加總
-    // 沒有速度或沒有路段資料的部分，用 DEFAULT_SPEED 補
+    // 速度最高以 SPEED_CAP 計；補值的路段 (est) 參與時間計算，但不算「真實資料」。
+    // 完全沒有任何速度的部分才用 DEFAULT_SPEED。
     function routeStats(secs, a, b) {
       const len = b - a;
       if (!(len > 0)) return null;
@@ -450,9 +476,11 @@
         if (st > cursor) time += (st - cursor) / DEFAULT_SPEED * 60;   // 路段之間的空隙
         const ov = en - st;
         if (s.speed) {
-          time += ov / s.speed * 60;
-          known += ov;
-          if (!min || s.speed < min.speed) min = { speed: s.speed, lo: st, hi: en };
+          time += ov / Math.min(s.speed, SPEED_CAP) * 60;
+          if (!s.est) {
+            known += ov;
+            if (!min || s.speed < min.speed) min = { speed: s.speed, lo: st, hi: en };
+          }
         } else {
           time += ov / DEFAULT_SPEED * 60;
         }
@@ -585,7 +613,7 @@
           const approach = apB > apA ? routeStats(secs, apA, apB) : null;
           const backup = !!(approach && approach.min && approach.min.speed < 40);
           const traffic = route && route.hasLive ? levelOf(route.avg, route.min.speed) : null;
-          return { ...s, dist, route, traffic, backup, mins: route ? route.mins : Math.max(1, Math.round(dist / DEFAULT_SPEED * 60)) };
+          return { ...s, dist, route, traffic, backup, mins: (route ? route.mins : Math.max(1, Math.round(dist / DEFAULT_SPEED * 60))) + STATION_BUFFER_MIN };
         })
         .sort((x, y) => south ? x.k - y.k : y.k - x.k);
 
@@ -601,7 +629,7 @@
       }
 
       const next = upcoming[0];
-      const partial = next.route && next.route.hasLive && next.route.knownRatio < 0.8;
+      const partial = next.route && next.route.hasLive && next.route.knownRatio < 0.9;
       const badge = next.traffic ? `
         <div class="flex flex-col items-end gap-1">
           <span class="px-2.5 py-1 text-xs font-bold rounded-full border ${next.traffic.color}">${next.traffic.label}</span>
@@ -612,8 +640,8 @@
         </div>` : '<span class="px-2.5 py-1 text-xs rounded-full bg-slate-700 text-slate-300">未取得即時速度</span>';
 
       const etaText = next.traffic
-        ? '依途中各路段即時速度估算 ~' + next.mins + ' 分鐘' + (partial ? '（部分路段無資料）' : '')
-        : '以 ' + DEFAULT_SPEED + ' km/h 估算 ~' + next.mins + ' 分鐘';
+        ? '依各路段即時速度估算 ~' + next.mins + ' 分鐘（含進場緩衝 ' + STATION_BUFFER_MIN + ' 分）' + (partial ? '，部分路段以鄰近路段補值' : '')
+        : '以 ' + DEFAULT_SPEED + ' km/h 估算 ~' + next.mins + ' 分鐘（含進場緩衝 ' + STATION_BUFFER_MIN + ' 分）';
 
       card.innerHTML = `
         <div class="flex justify-between items-start">
