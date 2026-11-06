@@ -2,8 +2,8 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>國道休息站即時看板 (國道里程精準版)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>國道休息站看板</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
@@ -32,14 +32,14 @@
 
   <main class="flex-1 max-w-xl w-full mx-auto p-3 sm:p-5 space-y-4">
 
-    <!-- 金鑰設定區塊 -->
+    <!-- 金鑰設定 -->
     <details id="tdx-details" class="bg-slate-800 rounded-2xl border border-slate-700/80 p-3 text-xs text-slate-300">
       <summary class="font-bold cursor-pointer text-emerald-400 flex items-center justify-between">
         <span><i class="fa-solid fa-key mr-1"></i> 設定 TDX API 金鑰</span>
-        <span class="text-[10px] bg-slate-700 px-2 py-0.5 rounded text-slate-300">點擊收合/展開</span>
+        <span class="text-[10px] bg-slate-700 px-2 py-0.5 rounded text-slate-300">點擊展開/收合</span>
       </summary>
       <div class="mt-3 space-y-2">
-        <p class="text-slate-400">填入 Client ID 與 Client Secret 以取得即時局部最低速路況。</p>
+        <p class="text-slate-400">金鑰只存在這支手機瀏覽器的 localStorage，不會寫進程式碼。</p>
         <div>
           <label class="block text-[11px] mb-1">Client ID:</label>
           <input type="text" id="tdx-client-id" placeholder="填入 Client ID" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white font-mono">
@@ -49,9 +49,18 @@
           <input type="password" id="tdx-client-secret" placeholder="填入 Client Secret" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white font-mono">
         </div>
         <button onclick="saveTDXCredentials()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded text-xs transition active:scale-95">
-          重新驗證並連線
+          儲存並重新連線
         </button>
         <div id="tdx-error-log" class="text-[11px] text-red-400 hidden bg-red-950/40 p-2 rounded border border-red-800/50 break-all"></div>
+
+        <div class="pt-2 border-t border-slate-700 space-y-2">
+          <div class="flex gap-2">
+            <button onclick="showDiag()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded text-xs active:scale-95">診斷資訊</button>
+            <button onclick="clearCaches()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded text-xs active:scale-95">清除快取並重載</button>
+          </div>
+          <button onclick="showStationKM()" class="w-full bg-emerald-700 hover:bg-emerald-600 text-white py-2 rounded text-xs active:scale-95">列出休息站里程（從路段資料反推）</button>
+          <pre id="diag" class="hidden text-[10px] text-slate-300 bg-slate-900 p-2 rounded border border-slate-700 whitespace-pre-wrap break-all max-h-72 overflow-auto"></pre>
+        </div>
       </div>
     </details>
 
@@ -77,17 +86,18 @@
       <div>
         <div class="flex justify-between items-center mb-1.5">
           <label class="text-xs font-semibold text-slate-400">當前位置 (國道里程 K)</label>
-          <button id="btn-gps" onclick="getLocationOnce()" class="flex items-center gap-1.5 text-xs bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full font-semibold active:bg-emerald-600/40">
+          <button id="btn-gps" onclick="getLocationOnce(false)" class="flex items-center gap-1.5 text-xs bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full font-semibold active:bg-emerald-600/40">
             <i class="fa-solid fa-location-crosshairs"></i> GPS 自動對應 K 數
           </button>
         </div>
-        
+
         <div class="flex items-center gap-2">
           <span class="text-2xl font-black text-slate-500">K</span>
           <input type="number" id="current-k" value="40" oninput="updateView()" class="w-full bg-slate-900 border border-slate-700 text-emerald-400 rounded-xl p-3 text-3xl font-black text-center focus:ring-2 focus:ring-emerald-500 focus:outline-none">
         </div>
+        <div id="gps-msg" class="text-[11px] text-slate-400 mt-2 min-h-[1rem]"></div>
 
-        <div class="grid grid-cols-4 gap-2 mt-3">
+        <div class="grid grid-cols-4 gap-2 mt-2">
           <button onclick="adjustK(-5)" class="py-3 bg-slate-700/60 active:bg-slate-600 text-slate-200 font-bold rounded-xl text-base">-5k</button>
           <button onclick="adjustK(-1)" class="py-3 bg-slate-700/60 active:bg-slate-600 text-slate-200 font-bold rounded-xl text-base">-1k</button>
           <button onclick="adjustK(1)" class="py-3 bg-slate-700/60 active:bg-slate-600 text-slate-200 font-bold rounded-xl text-base">+1k</button>
@@ -96,14 +106,20 @@
       </div>
     </section>
 
-    <!-- 下一個休息站動態卡片 -->
+    <!-- 路況更新列：只在載入或按下按鈕時才抓資料 -->
+    <div class="flex items-center justify-between bg-slate-800 rounded-2xl border border-slate-700/80 px-3 py-2">
+      <div id="update-info" class="text-xs text-slate-400">尚未取得路況</div>
+      <button id="btn-refresh" onclick="refresh(true)" class="flex items-center gap-1.5 text-xs bg-slate-700 text-slate-100 px-3 py-1.5 rounded-full font-semibold active:bg-slate-600">
+        <i class="fa-solid fa-rotate"></i> 重新整理路況
+      </button>
+    </div>
+
     <section id="next-station-card" class="bg-slate-800 text-white rounded-2xl p-5 shadow-lg relative overflow-hidden transition-all border border-slate-700">
       <div class="text-center py-4 text-slate-300">
-        <i class="fa-solid fa-spinner fa-spin mr-2"></i> 正在載入路況資料...
+        <i class="fa-solid fa-spinner fa-spin mr-2"></i> 正在載入...
       </div>
     </section>
 
-    <!-- 後續休息站清單 -->
     <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700/80 space-y-3">
       <h3 class="text-sm font-bold text-slate-400 flex items-center gap-2">
         <i class="fa-solid fa-list-ol"></i> 後續休息站預覽
@@ -113,469 +129,552 @@
   </main>
 
   <script>
+    // ============ 設定 ============
+    const DEFAULT_SPEED = 90;                 // 沒有即時速度時的估算車速 (km/h)
+    const LIVE_TTL_MS = 3 * 60 * 1000;        // 路況快取：3 分鐘內重開頁面不會重抓
+    const SECTION_TTL_MS = 7 * 24 * 3600 * 1000; // 路段靜態資料快取 7 天
+    const MIN_FORCE_GAP_MS = 15 * 1000;       // 連按「重新整理」的最短間隔
+    const OFF_ROAD_KM = 10;                   // 離概略路線超過這個距離，視為不在國道上
+    const CACHE_VER = 'v2';
+    const KEY_TOKEN = 'tdx_token_' + CACHE_VER;
+    const KEY_SECTIONS = 'tdx_sections_' + CACHE_VER;
+    const KEY_LIVE = 'tdx_live_' + CACHE_VER;
+    const LIVE_URL = 'https://tdx.transportdata.tw/api/basic/v2/Road/Traffic/Live/Freeway?$format=JSON';
+    const SECTION_URL = 'https://tdx.transportdata.tw/api/basic/v2/Road/Traffic/Section/Freeway?$format=JSON';
+    const TOKEN_URL = 'https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token';
+
+    // 休息站里程：國 1、國 3 來自 TDX 路段資料反推（官方里程）。
+    // 座標 (lat/lng) 只用於 GPS 換算 K 數；沒有座標 (null) 的站不參與 GPS 換算，但照常顯示。
+    // 國 5 的里程 (石碇 K4、蘇澳 K54) 取自維基百科，TDX 路段邊界名稱反推不到。
+    // note：顯示在卡片上的備註。
     const stationsData = {
       1: [
-        { name: "中壢服務區", k: 55, dir: "both", lat: 24.9708, lng: 121.2298 },
-        { name: "湖口服務區", k: 86, dir: "both", lat: 24.8966, lng: 121.0483 },
-        { name: "泰安服務區", k: 158, dir: "both", lat: 24.3315, lng: 120.7222 },
-        { name: "西螺服務區", k: 229, dir: "both", lat: 23.7744, lng: 120.4682 },
-        { name: "新營服務區", k: 284, dir: "both", lat: 23.3276, lng: 120.2882 },
-        { name: "仁德服務區", k: 316, dir: "both", lat: 22.9567, lng: 120.2520 }
+        { name: "中壢服務區", k: 55.1, dir: "both", lat: 24.9708, lng: 121.2298 },
+        { name: "楊梅休息站", k: 71.3, dir: "south", lat: 24.89975, lng: 121.14675, note: "僅南下設置，限五楊高架南下路段車輛進入" },
+        { name: "湖口服務區", k: 86.5, dir: "both", lat: 24.8966, lng: 121.0483 },
+        { name: "泰安服務區", k: 159.5, dir: "both", lat: 24.3315, lng: 120.7222 },
+        { name: "西螺服務區", k: 228.8, dir: "both", lat: 23.7744, lng: 120.4682 },
+        { name: "新營服務區", k: 284.2, dir: "both", lat: 23.3276, lng: 120.2882 },
+        { name: "仁德服務區", k: 335.1, dir: "both", lat: 22.9567, lng: 120.2520 }
       ],
       3: [
-        { name: "木柵休息站", k: 25, dir: "north", lat: 24.9892, lng: 121.5832 },
-        { name: "關西服務區", k: 55, dir: "both", lat: 24.8018, lng: 121.1895 },
-        { name: "寶山休息站", k: 96, dir: "south", lat: 24.7562, lng: 120.9995 },
-        { name: "西湖服務區", k: 135, dir: "both", lat: 24.5422, lng: 120.7610 },
-        { name: "清水服務區", k: 172, dir: "both", lat: 24.2662, lng: 120.5702 },
-        { name: "南投服務區", k: 224, dir: "both", lat: 23.9056, lng: 120.7088 },
-        { name: "古坑服務區", k: 269, dir: "both", lat: 23.6338, lng: 120.5794 },
-        { name: "東山服務區", k: 319, dir: "both", lat: 23.2381, lng: 120.4038 },
-        { name: "關廟服務區", k: 363, dir: "both", lat: 22.9463, lng: 120.3292 }
+        { name: "木柵休息站", k: 25.1, dir: "north", lat: 24.9892, lng: 121.5832 },
+        { name: "關西服務區", k: 76.2, dir: "both", lat: 24.8018, lng: 121.1895 },
+        { name: "寶山休息站", k: 96.6, dir: "south", lat: 24.7562, lng: 120.9995 },
+        { name: "西湖服務區", k: 134.8, dir: "both", lat: 24.5422, lng: 120.7610 },
+        { name: "清水服務區", k: 172.4, dir: "both", lat: 24.2662, lng: 120.5702 },
+        { name: "南投服務區", k: 231.4, dir: "both", lat: 23.9056, lng: 120.7088 },
+        { name: "古坑服務區", k: 276.9, dir: "both", lat: 23.6338, lng: 120.5794 },
+        { name: "東山服務區", k: 319.9, dir: "both", lat: 23.2381, lng: 120.4038 },
+        { name: "新化休息站", k: 350.6, dir: "both", lat: 23.031172, lng: 120.327526 },
+        { name: "關廟服務區", k: 363.8, dir: "both", lat: 22.9463, lng: 120.3292 }
       ],
       5: [
-        { name: "石碇服務區", k: 4, dir: "both", lat: 24.9902, lng: 121.6421 },
-        { name: "蘇澳服務區", k: 54, dir: "both", lat: 24.6062, lng: 121.8262 }
+        { name: "石碇服務區", k: 4, dir: "both", lat: 24.9902, lng: 121.6421, note: "不在國道上，需由石碇交流道下（市道106乙線）" },
+        { name: "蘇澳服務區", k: 54, dir: "both", lat: 24.6062, lng: 121.8262, note: "不在國道上，需由蘇澳交流道下（聯絡道上）" }
       ]
     };
-    
+
+    // ============ 狀態 ============
     let currentDir = 'south';
-    let tdxAccessToken = '';
-    let isConnectedTDX = false;
-    let mergedTrafficData = [];
-    
-    document.addEventListener("DOMContentLoaded", () => {
-      const savedId = localStorage.getItem('tdx_client_id') || '';
-      const savedSecret = localStorage.getItem('tdx_client_secret') || '';
-      if (savedId) document.getElementById('tdx-client-id').value = savedId;
-      if (savedSecret) document.getElementById('tdx-client-secret').value = savedSecret;
+    const state = {
+      sections: [],        // 正規化後的路段 {id, road, dir, lo, hi}
+      live: {},            // SectionID -> 速度
+      liveFetchedAt: null, // 最近一次實際查詢時間 (ms)
+      dataTime: null,      // TDX 回傳的資料時間 (字串)
+      liveOk: false,
+      rawSample: null,
+      unknownDir: 0,
+      lastError: ''
+    };
 
-      fetchAllTDXData();
-      
-      // 💡 網頁一載入就自動執行一次 GPS 緯度換算 K 數
-      setTimeout(getLocationOnce, 500); 
-    });
-
+    // ============ 小工具 ============
+    const $ = (id) => document.getElementById(id);
+    function readJSON(key) { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { return null; } }
+    function writeJSON(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* 空間不足就算了 */ } }
+    function pick(o, keys) { if (!o) return undefined; for (const k of keys) { if (o[k] !== undefined && o[k] !== null) return o[k]; } return undefined; }
+    function fmtTime(ms) { return new Date(ms).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }); }
+    function agoText(ms) {
+      const m = Math.max(0, Math.round((Date.now() - ms) / 60000));
+      if (m < 1) return '剛剛';
+      if (m < 60) return m + ' 分鐘前';
+      return Math.round(m / 60) + ' 小時前';
+    }
 
     function showErrorLog(msg) {
-      const logDiv = document.getElementById('tdx-error-log');
-      if (msg) {
-        logDiv.innerText = msg;
-        logDiv.classList.remove('hidden');
-      } else {
-        logDiv.classList.add('hidden');
+      const logDiv = $('tdx-error-log');
+      if (msg) { logDiv.innerText = msg; logDiv.classList.remove('hidden'); }
+      else { logDiv.classList.add('hidden'); }
+    }
+
+    function setStatus(kind, text) {
+      const dot = $('traffic-status-dot');
+      $('traffic-source-tag').innerText = text;
+      const colors = { none: 'bg-slate-500', loading: 'bg-amber-500 animate-pulse', ok: 'bg-emerald-500', error: 'bg-red-500' };
+      dot.className = 'w-2 h-2 rounded-full ' + (colors[kind] || colors.none);
+    }
+
+    // ============ TDX 連線 ============
+    async function getToken(force) {
+      const clientId = localStorage.getItem('tdx_client_id');
+      const clientSecret = localStorage.getItem('tdx_client_secret');
+      if (!clientId || !clientSecret) { showErrorLog('尚未填入 Client ID 或 Secret'); return null; }
+
+      const cached = readJSON(KEY_TOKEN);
+      if (!force && cached && cached.cid === clientId && cached.exp > Date.now()) return cached.token;
+
+      const body = new URLSearchParams();
+      body.append('grant_type', 'client_credentials');
+      body.append('client_id', clientId);
+      body.append('client_secret', clientSecret);
+      try {
+        const res = await fetch(TOKEN_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body
+        });
+        if (!res.ok) { showErrorLog('驗證失敗 HTTP ' + res.status); return null; }
+        const data = await res.json();
+        if (!data.access_token) { showErrorLog('驗證回應沒有 access_token'); return null; }
+        const ttl = Math.max(60, (Number(data.expires_in) || 3600) - 120);
+        writeJSON(KEY_TOKEN, { token: data.access_token, exp: Date.now() + ttl * 1000, cid: clientId });
+        showErrorLog('');
+        return data.access_token;
+      } catch (e) {
+        showErrorLog('Token 連線失敗: ' + e.message);
+        return null;
+      }
+    }
+
+    async function tdxGet(url) {
+      let token = await getToken(false);
+      if (!token) throw new Error('NO_TOKEN');
+      const doFetch = (t) => fetch(url, { headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + t } });
+      let res = await doFetch(token);
+      if (res.status === 401) {                 // Token 失效就換一次再試
+        token = await getToken(true);
+        if (!token) throw new Error('NO_TOKEN');
+        res = await doFetch(token);
+      }
+      if (res.status === 429) throw new Error('TDX 請求太頻繁 (429)，請稍後再試');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }
+
+    // ============ 路段靜態資料 (取代手打 SectionID 對照表) ============
+    function parseKM(v) {
+      if (v === undefined || v === null) return NaN;
+      const m = String(v).trim().match(/^(\d+)\s*K\s*\+\s*(\d+)$/i);
+      if (m) return Number(m[1]) + Number(m[2]) / 1000;
+      return Number(v);
+    }
+
+    function normalizeSection(r) {
+      const id = String(pick(r, ['SectionID', 'SectionId']) ?? '');
+      if (!id) return null;
+
+      // 國道編號
+      const text = String(r.RoadName || '') + ' ' + String(r.SectionName || '');
+      const m = text.match(/國道?\s*(\d+)\s*號?\s*(甲|乙|高架)?/);
+      let road = m ? m[1] + (m[2] || '') : null;
+      if (!road) {
+        const n = parseInt(r.RoadID, 10);
+        if (n > 0 && n % 10 === 0) road = String(n / 10);
+      }
+      if (!['1', '3', '5'].includes(road)) return null;
+
+      // 方向
+      let dir = null;
+      const dirField = String(pick(r, ['RoadDirection', 'Direction', 'SectionDirection']) ?? '');
+      if (/南|^\s*[SE]\s*$/i.test(dirField)) dir = 'south';
+      else if (/北|^\s*[NW]\s*$/i.test(dirField)) dir = 'north';
+      else if (/南下|南向/.test(String(r.SectionName || ''))) dir = 'south';
+      else if (/北上|北向/.test(String(r.SectionName || ''))) dir = 'north';
+
+      // 里程：TDX 格式是 "12K+345"（12.345 公里）；也相容純數字
+      const mile = r.SectionMile || {};
+      const a = parseKM(pick(mile, ['StartKM', 'StartKm', 'Start']) ?? pick(r, ['StartKM', 'StartMile']));
+      const b = parseKM(pick(mile, ['EndKM', 'EndKm', 'End']) ?? pick(r, ['EndKM', 'EndMile']));
+      if (!isFinite(a) || !isFinite(b)) return null;
+      let lo = Math.min(a, b), hi = Math.max(a, b);
+      if (hi > 1000) { lo /= 1000; hi /= 1000; }   // 若單位是公尺
+      if (hi <= lo) return null;
+
+      const rs = r.RoadSection || {};
+      return { id, road, dir, lo, hi, start: rs.Start || '', end: rs.End || '' };
+    }
+
+    async function loadSections() {
+      const c = readJSON(KEY_SECTIONS);
+      if (c && c.list && c.list.length && Date.now() - c.t < SECTION_TTL_MS) {
+        state.sections = c.list; state.rawSample = c.sample; state.unknownDir = c.unknownDir || 0;
+        return;
+      }
+      const data = await tdxGet(SECTION_URL);
+      const arr = Array.isArray(data) ? data : (data.Sections || data.SectionData || []);
+      state.rawSample = arr[0] || null;
+      const list = arr.map(normalizeSection).filter(Boolean);
+      if (!list.length) throw new Error('路段資料解析不到國道 1/3/5 號，請按「診斷資訊」查看原始欄位');
+      state.sections = list;
+      state.unknownDir = list.filter(s => !s.dir).length;
+      writeJSON(KEY_SECTIONS, { t: Date.now(), list, sample: state.rawSample, unknownDir: state.unknownDir });
+    }
+
+    // ============ 即時路況 (只在載入 / 手動按鈕時才抓，並有快取) ============
+    async function loadLive(force) {
+      const c = readJSON(KEY_LIVE);
+      if (c && !force && Date.now() - c.t < LIVE_TTL_MS) {
+        state.live = c.speeds; state.liveFetchedAt = c.t; state.dataTime = c.dt; state.liveOk = true;
+        return 'cache';
+      }
+      if (force && c && Date.now() - c.t < MIN_FORCE_GAP_MS) {
+        state.live = c.speeds; state.liveFetchedAt = c.t; state.dataTime = c.dt; state.liveOk = true;
+        return 'throttled';
+      }
+      const data = await tdxGet(LIVE_URL);
+      const arr = Array.isArray(data) ? data : (data.LiveTraffics || data.Traffics || []);
+      const speeds = {};
+      let latest = null;
+      arr.forEach(item => {
+        const id = String(item.SectionID || '');
+        const spd = Number(item.TravelSpeed ?? item.AvgSpeed ?? -1);
+        if (id && spd > 0) speeds[id] = spd;
+        const dt = item.DataCollectTime;
+        if (dt && (!latest || dt > latest)) latest = dt;
+      });
+      if (!latest) latest = data.SrcUpdateTime || data.UpdateTime || null;
+      state.live = speeds; state.liveFetchedAt = Date.now(); state.dataTime = latest; state.liveOk = true;
+      writeJSON(KEY_LIVE, { t: state.liveFetchedAt, speeds, dt: latest });
+      return 'fetched';
+    }
+
+    async function refresh(force) {
+      const hasKey = localStorage.getItem('tdx_client_id') && localStorage.getItem('tdx_client_secret');
+      if (!hasKey) {
+        state.liveOk = false;
+        setStatus('none', '基本模式 (未設定金鑰)');
+        updateView();
+        return;
+      }
+      setStatus('loading', '讀取路況中...');
+      $('btn-refresh').disabled = true;
+      try {
+        if (!state.sections.length) await loadSections();
+        const how = await loadLive(!!force);
+        state.lastError = '';
+        showErrorLog('');
+        setStatus('ok', how === 'cache' ? 'TDX 已連線 (快取)' : 'TDX 已連線');
+      } catch (e) {
+        state.liveOk = false;
+        state.lastError = e.message;
+        if (e.message !== 'NO_TOKEN') showErrorLog('路況讀取失敗: ' + e.message);
+        setStatus('error', '路況讀取失敗');
+      } finally {
+        $('btn-refresh').disabled = false;
+        updateView();
       }
     }
 
     function saveTDXCredentials() {
-      const id = document.getElementById('tdx-client-id').value.trim();
-      const secret = document.getElementById('tdx-client-secret').value.trim();
-      localStorage.setItem('tdx_client_id', id);
-      localStorage.setItem('tdx_client_secret', secret);
-      tdxAccessToken = ''; 
-      fetchAllTDXData();
+      localStorage.setItem('tdx_client_id', $('tdx-client-id').value.trim());
+      localStorage.setItem('tdx_client_secret', $('tdx-client-secret').value.trim());
+      localStorage.removeItem(KEY_TOKEN);
+      refresh(true);
     }
 
-    async function getTDXToken() {
-      const clientId = localStorage.getItem('tdx_client_id');
-      const clientSecret = localStorage.getItem('tdx_client_secret');
-
-      if (!clientId || !clientSecret) {
-        showErrorLog("尚未填入 Client ID 或 Secret");
-        return null;
-      }
-
-      const tokenUrl = 'https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token';
-      const parameter = new URLSearchParams();
-      parameter.append('grant_type', 'client_credentials');
-      parameter.append('client_id', clientId);
-      parameter.append('client_secret', clientSecret);
-
-      try {
-        const response = await fetch(tokenUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: parameter
-        });
-
-        if (!response.ok) {
-          showErrorLog(`驗證失敗 HTTP ${response.status}`);
-          return null;
-        }
-
-        const data = await response.json();
-        showErrorLog('');
-        return data.access_token || null;
-      } catch (e) {
-        showErrorLog("Token 連線失敗: " + e.message);
-        return null;
-      }
+    function clearCaches() {
+      [KEY_TOKEN, KEY_SECTIONS, KEY_LIVE].forEach(k => localStorage.removeItem(k));
+      location.reload();
     }
 
-    async function fetchAllTDXData() {
-      const tag = document.getElementById('traffic-source-tag');
-      const dot = document.getElementById('traffic-status-dot');
+    function showDiag() {
+      const pre = $('diag');
+      const secs = activeSections();
+      const lines = [
+        '路段總數 (國道1/3/5): ' + state.sections.length,
+        '無法判斷方向的路段數: ' + state.unknownDir,
+        '目前所選國道/方向的路段數: ' + secs.length + '，其中有即時速度: ' + secs.filter(s => s.speed).length,
+        '即時速度總筆數: ' + Object.keys(state.live).length,
+        '路況資料時間: ' + (state.dataTime || '無'),
+        '最近錯誤: ' + (state.lastError || '無'),
+        '--- 路段原始資料範例 (第一筆) ---',
+        JSON.stringify(state.rawSample, null, 1) || '無（可能使用快取，可按「清除快取並重載」）'
+      ];
+      pre.innerText = lines.join('\n');
+      pre.classList.remove('hidden');
+    }
 
-      tag.innerText = "正在同步最低速路況...";
-      dot.className = "w-2 h-2 rounded-full bg-amber-500 animate-pulse";
-
-      tdxAccessToken = await getTDXToken();
-      if (!tdxAccessToken) {
-        isConnectedTDX = false;
-        tag.innerText = "基本模式 (未連線 TDX)";
-        dot.className = "w-2 h-2 rounded-full bg-slate-500";
-        updateView();
-        return;
-      }
-
-      const headers = { 'Accept': 'application/json', 'Authorization': `Bearer ${tdxAccessToken}` };
-      let speedMap = {};
-
-      try {
-        const liveUrl = `https://tdx.transportdata.tw/api/basic/v2/Road/Traffic/Live/Freeway?$format=JSON`;
-        const liveRes = await fetch(liveUrl, { headers });
-        
-        if (liveRes.ok) {
-          const lData = await liveRes.json();
-          const rawList = Array.isArray(lData) ? lData : (lData.LiveTraffics || lData.Traffics || []);
-          rawList.forEach(item => {
-            const sId = String(item.SectionID || "");
-            const spd = Number(item.TravelSpeed ?? item.AvgSpeed ?? -1);
-            if (sId && spd > 0) speedMap[sId] = spd; // 嚴格過濾 0 與負數
-          });
-        }
-      } catch (e) {
-        console.warn("TDX API 讀取失敗:", e);
-      }
-
-      const highway = document.getElementById('highway-select').value;
-      const directionSelect = document.getElementById('direction-select');
-      const direction = directionSelect ? Number(directionSelect.value) : 2; 
-
-      const mappingDatabase = {
-        "1": {
-          1: [
-            { startK: 300, endK: 374, tdxIDs: ["0160", "0162", "0164", "0166", "0434", "0436", "0438", "0440"] },
-            { startK: 250, endK: 299, tdxIDs: ["0168", "0170", "0172", "0174", "0176", "0178", "0491", "0492"] },
-            { startK: 180, endK: 249, tdxIDs: ["0180", "0182", "0186", "0188", "0190", "0192", "0194", "0196"] },
-            { startK: 130, endK: 179, tdxIDs: ["0198", "0200", "0202", "0204", "0206", "0470", "0210", "0212"] },
-            { startK: 80, endK: 129, tdxIDs: ["0214", "0216", "0218", "0220", "0224", "0226", "0228", "0230"] },
-            { startK: 40, endK: 79, tdxIDs: ["0232", "0234", "0236", "0238", "0242", "0244", "0246", "0248"] },
-            { startK: 15, endK: 39, tdxIDs: ["0250", "0254", "0256", "0258", "0260", "0262", "0264", "0266"] },
-            { startK: 0, endK: 14, tdxIDs: ["0268", "0270", "0272", "0274", "0412", "0276", "0278", "0280"] }
-          ],
-          2: [
-            { startK: 0, endK: 39, tdxIDs: ["0159", "0161", "0163", "0165", "0433", "0435", "0437", "0439"] },
-            { startK: 40, endK: 99, tdxIDs: ["0167", "0169", "0171", "0173", "0175", "0177", "0471", "0441"] },
-            { startK: 100, endK: 179, tdxIDs: ["0179", "0181", "0185", "0187", "0189", "0191", "0193", "0195"] },
-            { startK: 180, endK: 239, tdxIDs: ["0197", "0199", "0201", "0203", "0205", "0469", "0209", "0211"] },
-            { startK: 240, endK: 299, tdxIDs: ["0213", "0215", "0217", "0219", "0221", "0223", "0225", "0227"] },
-            { startK: 300, endK: 374, tdxIDs: ["0229", "0231", "0233", "0235", "0237", "0241", "0243", "0245"] }
-          ]
-        },
-        "3": {
-          1: [
-            { startK: 280, endK: 430, tdxIDs: ["0001", "0003", "0005", "0007", "0011", "0013", "0015", "0017"] },
-            { startK: 150, endK: 279, tdxIDs: ["0019", "0021", "0023", "0025", "0027", "0029", "0031", "0033", "0035", "0037"] },
-            { startK: 60, endK: 149, tdxIDs: ["0039", "0041", "0043", "0045", "0047", "0049", "0053", "0055", "0057", "0059"] },
-            { startK: 0, endK: 59, tdxIDs: ["0061", "0063", "0067", "0069", "0071", "0073", "0077", "0079", "0081", "0083"] }
-          ],
-          2: [
-            { startK: 0, endK: 59, tdxIDs: ["0002", "0004", "0006", "0008", "0012", "0014", "0016", "0018", "0020", "0022"] },
-            { startK: 60, endK: 179, tdxIDs: ["0024", "0026", "0028", "0030", "0032", "0034", "0036", "0038", "0040", "0042"] },
-            { startK: 180, endK: 329, tdxIDs: ["0044", "0046", "0048", "0050", "0054", "0056", "0058", "0060", "0062", "0064"] },
-            { startK: 330, endK: 430, tdxIDs: ["0068", "0070", "0072", "0074", "0078", "0080", "0082", "0084", "0086", "0088"] }
-          ]
-        },
-        "5": {
-          1: [{ startK: 0, endK: 60, tdxIDs: ["2131", "2132", "2133", "2134", "2135", "2136", "2137", "2138", "2139", "2140"] }],
-          2: [{ startK: 0, endK: 60, tdxIDs: ["2255", "2256", "2275"] }]
-        }
+    // 從路段邊界名稱反推服務區/休息站的里程
+    function showStationKM() {
+      const pre = $('diag');
+      if (!state.sections.length) { pre.innerText = '尚未載入路段資料，請先設定金鑰並連線。'; pre.classList.remove('hidden'); return; }
+      const found = new Map();
+      const add = (s, name, which) => {
+        if (!/服務區|休息站/.test(name)) return;
+        // 南下里程遞增：起點=lo、終點=hi；北上里程遞減：起點=hi、終點=lo
+        const k = (s.dir === 'south') === (which === 'start') ? s.lo : s.hi;
+        const key = s.road + '|' + (s.dir === 'south' ? '南下' : s.dir === 'north' ? '北上' : '?') + '|' + name + '|' + k.toFixed(1);
+        found.set(key, { road: s.road, dir: s.dir === 'south' ? '南下' : s.dir === 'north' ? '北上' : '?', name, k });
       };
-
-      const highwayMap = mappingDatabase[highway] || mappingDatabase["3"];
-      const targetSections = highwayMap[direction] || highwayMap[2];
-
-      mergedTrafficData = targetSections.map(sec => {
-        let validSpeeds = [];
-        (sec.tdxIDs || []).forEach(id => {
-          if (speedMap[id] !== undefined && speedMap[id] > 0) validSpeeds.push(speedMap[id]);
-        });
-        if (validSpeeds.length === 0) return null;
-        return {
-          startK: sec.startK,
-          endK: sec.endK,
-          speed: Math.round(validSpeeds.reduce((a, b) => a + b, 0) / validSpeeds.length),
-          minSpeed: Math.min(...validSpeeds)
-        };
-      }).filter(Boolean);
-
-      isConnectedTDX = true;
-      tag.innerText = "TDX 最低速追蹤已啟用";
-      dot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
-
-      updateView();
-    }
-
-    function onFilterChange() { fetchAllTDXData(); }
-    function onDirectionChange() {
-      const dirVal = document.getElementById('direction-select').value;
-      currentDir = (dirVal === '1') ? 'north' : 'south';
-      fetchAllTDXData();
-    }
-
-    function adjustK(val) {
-      const input = document.getElementById('current-k');
-      let current = parseFloat(input.value) || 0;
-      input.value = Math.max(0, current + val);
-      updateView();
-    }
-
-    function getLocationOnce() {
-      const btn = document.getElementById('btn-gps');
-      if (!navigator.geolocation) {
-        alert("您的裝置不支援 GPS 定位");
-        return;
+      state.sections.forEach(s => { add(s, s.start, 'start'); add(s, s.end, 'end'); });
+      const rows = [...found.values()].sort((a, b) => (a.road - b.road) || (a.dir > b.dir ? 1 : a.dir < b.dir ? -1 : 0) || a.k - b.k);
+      const lines = ['國道 方向 名稱 里程(K)'];
+      rows.forEach(r => lines.push('國道' + r.road + ' ' + r.dir + ' ' + r.name + ' K' + r.k.toFixed(1)));
+      if (!rows.length) {
+        lines.push('（沒有任何路段邊界名稱含「服務區」或「休息站」，請貼下面的名稱範例給我）');
+        const names = [...new Set(state.sections.flatMap(s => [s.start, s.end]))].filter(Boolean).slice(0, 60);
+        lines.push(names.join('、'));
       }
+      pre.innerText = lines.join('\n');
+      pre.classList.remove('hidden');
+    }
 
-      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 精準計算中...`;
-      
+    // ============ 路況計算 ============
+    function activeSections() {
+      const hw = $('highway-select').value;
+      return state.sections
+        .filter(s => s.road === hw && s.dir === currentDir)
+        .map(s => ({ id: s.id, lo: s.lo, hi: s.hi, speed: state.live[s.id] ?? null }))
+        .sort((a, b) => a.lo - b.lo);
+    }
+
+    // 計算 [a, b] 這段里程 (a < b) 的行車時間：逐路段「長度 ÷ 該段速度」加總
+    // 沒有速度或沒有路段資料的部分，用 DEFAULT_SPEED 補
+    function routeStats(secs, a, b) {
+      const len = b - a;
+      if (!(len > 0)) return null;
+      let time = 0, known = 0, min = null, cursor = a;
+      for (const s of secs) {
+        const st = Math.max(s.lo, cursor), en = Math.min(s.hi, b);
+        if (en <= st) continue;
+        if (st > cursor) time += (st - cursor) / DEFAULT_SPEED * 60;   // 路段之間的空隙
+        const ov = en - st;
+        if (s.speed) {
+          time += ov / s.speed * 60;
+          known += ov;
+          if (!min || s.speed < min.speed) min = { speed: s.speed, lo: st, hi: en };
+        } else {
+          time += ov / DEFAULT_SPEED * 60;
+        }
+        cursor = en;
+      }
+      if (cursor < b) time += (b - cursor) / DEFAULT_SPEED * 60;       // 尾端沒有資料的部分
+      return {
+        mins: Math.max(1, Math.round(time)),
+        avg: Math.round(len / (time / 60)),
+        min,
+        knownRatio: known / len,
+        hasLive: known > 0
+      };
+    }
+
+    function levelOf(avg, minSpd) {
+      if (avg < 40) return { label: '路段壅塞', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' };
+      if (avg < 60) return { label: '車多擁擠', color: 'bg-red-500/20 text-red-300 border-red-500/30' };
+      if (avg < 75) return { label: '車多順暢', color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' };
+      if (minSpd < 40) return { label: '局部車多', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' };
+      return { label: '順暢', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' };
+    }
+
+    // ============ GPS → 國道里程 ============
+    // 把使用者位置投影到「相鄰休息站連線」上，依投影比例內插 K 數。
+    // 只用休息站座標，所以是概略值；彎道多的路段會有幾公里誤差。
+    function locateK(lat, lng, list) {
+      const pts = list.filter(p => p.lat != null && p.lng != null).sort((a, b) => a.k - b.k);
+      if (pts.length < 2) return null;
+      const KM = 111.19, cosLat = Math.cos(lat * Math.PI / 180);
+      const toXY = (la, ln) => ({ x: (ln - lng) * cosLat * KM, y: (la - lat) * KM }); // 使用者在原點
+      let best = null;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const A = toXY(pts[i].lat, pts[i].lng), B = toXY(pts[i + 1].lat, pts[i + 1].lng);
+        const dx = B.x - A.x, dy = B.y - A.y, L2 = dx * dx + dy * dy;
+        if (L2 === 0) continue;
+        let t = (-A.x * dx - A.y * dy) / L2;
+        const tMin = i === 0 ? -1 : 0, tMax = i === pts.length - 2 ? 2 : 1; // 兩端可往外延伸
+        t = Math.max(tMin, Math.min(tMax, t));
+        const d = Math.hypot(A.x + t * dx, A.y + t * dy);
+        if (!best || d < best.d) best = { d, k: pts[i].k + t * (pts[i + 1].k - pts[i].k) };
+      }
+      return best;
+    }
+
+    function getLocationOnce(isAuto) {
+      const btn = $('btn-gps');
+      const msg = $('gps-msg');
+      const reset = () => { btn.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i> GPS 自動對應 K 數'; };
+      if (!navigator.geolocation) { msg.innerText = '這個裝置不支援 GPS 定位'; return; }
+
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 定位中...';
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const userLat = position.coords.latitude;
-          const highway = document.getElementById('highway-select').value;
-          const list = stationsData[highway] || [];
+        (pos) => {
+          const c = pos.coords;
+          const hw = $('highway-select').value;
 
-          if (list.length < 2) {
-            alert("該國道休息站資料不足");
-            btn.innerHTML = `<i class="fa-solid fa-location-crosshairs"></i> GPS 自動對應 K 數`;
+          // 行車中有方向資料時，順便切換南下/北上
+          let dirNote = '';
+          if (c.heading != null && !isNaN(c.heading) && (c.speed || 0) > 8) {
+            const south = c.heading > 90 && c.heading < 270;
+            $('direction-select').value = south ? '2' : '1';
+            currentDir = south ? 'south' : 'north';
+            dirNote = '，已依行車方向切換為' + (south ? '南下' : '北上');
+          }
+
+          const r = locateK(c.latitude, c.longitude, stationsData[hw] || []);
+          if (!r) { msg.innerText = '這條國道的休息站資料不足，無法換算'; reset(); return; }
+
+          if (r.d > OFF_ROAD_KM) {
+            msg.innerText = '目前位置離國道 ' + hw + ' 號概略路線約 ' + Math.round(r.d) + ' 公里，看起來不在這條國道上，沒有更新 K 數，請手動輸入。';
+            reset();
+            updateView();
             return;
           }
-
-          // 依照緯度排序休息站（緯度由高到低，即由北到南）
-          // 國道通常北邊緯度高、K數小；南邊緯度低、K數大
-          let sortedStations = [...list].sort((a, b) => b.lat - a.lat);
-
-          let estimatedK = 40; // 預設值
-
-          // 判斷你在哪兩個休息站之間
-          if (userLat >= sortedStationLat(sortedStations[0])) {
-            // 比最北邊的休息站還北邊，用前段比例推算
-            const s1 = sortedStations[0];
-            const s2 = sortedStations[1];
-            let ratio = (userLat - s2.lat) / (s1.lat - s2.lat);
-            estimatedK = Math.round(s2.k - ratio * (s2.k - s1.k));
-          } else if (userLat <= sortedStations[sortedStations.length - 1].lat) {
-            // 比最南邊的休息站還南邊
-            const s1 = sortedStations[sortedStations.length - 2];
-            const s2 = sortedStations[sortedStations.length - 1];
-            let ratio = (userLat - s2.lat) / (s1.lat - s2.lat);
-            estimatedK = Math.round(s2.k + (1 - ratio) * (s2.k - s1.k));
-          } else {
-            // 夾在中間的某兩個休息站之間
-            for (let i = 0; i < sortedStations.length - 1; i++) {
-              let northStation = sortedStations[i]; // 比較北 (緯度高, K數小)
-              let southStation = sortedStations[i+1]; // 比較南 (緯度低, K數大)
-
-              if (userLat <= northStation.lat && userLat >= southStation.lat) {
-                // 進行線性內插計算精準 K 數
-                let totalLatSpan = northStation.lat - southStation.lat;
-                let userLatSpan = northStation.lat - userLat;
-                let fraction = userLatSpan / totalLatSpan;
-                
-                let totalKSpan = southStation.k - northStation.k;
-                estimatedK = Math.round(northStation.k + (fraction * totalKSpan));
-                break;
-              }
-            }
-          }
-
-          estimatedK = Math.max(0, estimatedK);
-
-          // 賦值並更新畫面
-          document.getElementById('current-k').value = estimatedK;
+          const k = Math.max(0, Math.round(r.k));
+          $('current-k').value = k;
+          msg.innerText = '已定位約 K' + k + '（概略內插，可能有數公里誤差，可用 ± 微調）' + dirNote;
+          btn.innerHTML = '<i class="fa-solid fa-check text-emerald-400"></i> 已定位 (' + k + 'K)';
+          setTimeout(reset, 3000);
           updateView();
-
-          btn.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> 已定位 (${estimatedK}K)`;
-          setTimeout(() => {
-            btn.innerHTML = `<i class="fa-solid fa-location-crosshairs"></i> GPS 自動對應 K 數`;
-          }, 3000);
         },
         () => {
-          alert("無法取得 GPS 位置，請確認手機已開啟定位權限。");
-          btn.innerHTML = `<i class="fa-solid fa-location-crosshairs"></i> GPS 自動對應 K 數`;
+          msg.innerText = isAuto ? '' : '無法取得 GPS 位置，請確認已開啟定位權限。';
+          reset();
         },
         { timeout: 8000, enableHighAccuracy: true }
       );
     }
 
-    // 輔助函式避免作用域混淆
-    function sortedStationLat(s) {
-      return s.lat;
+    // ============ 介面 ============
+    function onFilterChange() { $('gps-msg').innerText = ''; updateView(); }
+    function onDirectionChange() {
+      currentDir = ($('direction-select').value === '1') ? 'north' : 'south';
+      updateView();
+    }
+    function adjustK(val) {
+      const input = $('current-k');
+      input.value = Math.max(0, (parseFloat(input.value) || 0) + val);
+      updateView();
     }
 
-
-    function getDistanceInKm(lat1, lon1, lat2, lon2) {
-      const R = 6371;
-      const dLat = (lat2 - lat1) * Math.PI / 180;
-      const dLon = (lon2 - lon1) * Math.PI / 180;
-      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon/2) * Math.sin(dLon/2);
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    function updateInfoBar() {
+      const el = $('update-info');
+      if (!state.liveOk || !state.liveFetchedAt) { el.innerText = state.lastError && state.lastError !== 'NO_TOKEN' ? '路況讀取失敗' : '尚未取得路況'; return; }
+      const dt = state.dataTime ? Date.parse(state.dataTime) : NaN;
+      const base = isFinite(dt) ? dt : state.liveFetchedAt;
+      const stale = Date.now() - base > 10 * 60 * 1000;
+      el.innerHTML = '路況資料 ' + fmtTime(base) + '（' + agoText(base) + '）' +
+        (stale ? ' <span class="text-amber-400">資料偏舊</span>' : '');
     }
-
-    function getTrafficStatusByK(stationK) {
-      if (!isConnectedTDX || mergedTrafficData.length === 0) return null;
-      const matched = mergedTrafficData.find(sec => stationK >= sec.startK && stationK <= sec.endK) || mergedTrafficData[0];
-      
-      const avgSpd = matched.speed;
-      const minSpd = matched.minSpeed;
-
-      let label = "順暢";
-      let statusColor = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
-
-      // 1. 主狀態判定：依據整體平均速度，決定卡片顏色與大標籤
-      if (avgSpd < 40) {
-        label = "路段壅塞";
-        statusColor = "bg-purple-500/20 text-purple-300 border-purple-500/30";
-      } else if (avgSpd < 60) {
-        label = "車多擁擠";
-        statusColor = "bg-red-500/20 text-red-300 border-red-500/30";
-      } else if (avgSpd < 75) {
-        label = "車多順暢";
-        statusColor = "bg-amber-500/20 text-amber-300 border-amber-500/30";
-      } else {
-        // 2. 💡 關鍵點：如果平均很順，但最低速低於 40（代表有局部小塞車/回堵），給予溫馨提醒！
-        if (minSpd < 40) {
-          label = "局部車多";
-          statusColor = "bg-blue-500/20 text-blue-300 border-blue-500/30";
-        } else {
-          label = "順暢";
-          statusColor = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
-        }
-      }
-
-      return { avgSpeed: avgSpd, minSpeed: minSpd, label, statusColor };
-    }
-
-
 
     function updateView() {
-      const highway = document.getElementById('highway-select').value;
-      const currentK = parseFloat(document.getElementById('current-k').value) || 0;
-      const list = stationsData[highway] || [];
-      let validStations = list.filter(s => s.dir === 'both' || s.dir === currentDir);
-      
-      let upcoming = [];
-      if(currentDir === 'south') {
-        upcoming = validStations
-          .filter(s => s.k > currentK)
-          .map(s => {
-            const dist = parseFloat((s.k - currentK).toFixed(1)); // 剩餘公裡數
-            const traffic = getTrafficStatusByK(s.k);
-            
-            // 💡 修正：直接用該點取得的平均車速來算時間 (不累積加總多個區段)
-            // 如果沒抓到路況，預設用時速 90~100 公里去跑
-            const speedUsed = (traffic && traffic.avgSpeed > 20) ? traffic.avgSpeed : 90;
-            const mins = Math.max(1, Math.round((dist / speedUsed) * 60));
-            
-            return { ...s, dist, traffic, mins };
-          })
-          .sort((a,b) => a.k - b.k);
-      } else {
-        upcoming = validStations
-          .filter(s => s.k < currentK)
-          .map(s => {
-            const dist = parseFloat((currentK - s.k).toFixed(1));
-            const traffic = getTrafficStatusByK(s.k);
-            
-            const speedUsed = (traffic && traffic.avgSpeed > 20) ? traffic.avgSpeed : 90;
-            const mins = Math.max(1, Math.round((dist / speedUsed) * 60));
-            
-            return { ...s, dist, traffic, mins };
-          })
-          .sort((a,b) => b.k - a.k);
+      updateInfoBar();
+      const highway = $('highway-select').value;
+      const currentK = parseFloat($('current-k').value) || 0;
+      const south = currentDir === 'south';
+      const secs = activeSections();
+      const valid = (stationsData[highway] || []).filter(s => s.dir === 'both' || s.dir === currentDir);
+
+      const upcoming = valid
+        .filter(s => south ? s.k > currentK : s.k < currentK)
+        .map(s => {
+          const a = south ? currentK : s.k, b = south ? s.k : currentK;
+          const dist = parseFloat((b - a).toFixed(1));
+          const route = routeStats(secs, a, b);
+          // 進站前約 5 公里：車速太低代表匝道可能回堵
+          const apA = south ? Math.max(currentK, s.k - 5) : s.k;
+          const apB = south ? s.k : Math.min(currentK, s.k + 5);
+          const approach = apB > apA ? routeStats(secs, apA, apB) : null;
+          const backup = !!(approach && approach.min && approach.min.speed < 40);
+          const traffic = route && route.hasLive ? levelOf(route.avg, route.min.speed) : null;
+          return { ...s, dist, route, traffic, backup, mins: route ? route.mins : Math.max(1, Math.round(dist / DEFAULT_SPEED * 60)) };
+        })
+        .sort((x, y) => south ? x.k - y.k : y.k - x.k);
+
+      const card = $('next-station-card');
+      const listContainer = $('upcoming-list');
+
+      if (!upcoming.length) {
+        card.innerHTML = '<div class="text-lg font-bold">前方方向已無休息站</div>' +
+          '<div class="text-xs text-slate-200 mt-1">您已通過該國道當前方向的所有休息站。</div>';
+        card.className = 'bg-slate-700 text-white rounded-2xl p-5 shadow-lg transition-all';
+        listContainer.innerHTML = '<div class="text-xs text-slate-500 text-center py-2">--</div>';
+        return;
       }
 
+      const next = upcoming[0];
+      const partial = next.route && next.route.hasLive && next.route.knownRatio < 0.8;
+      const badge = next.traffic ? `
+        <div class="flex flex-col items-end gap-1">
+          <span class="px-2.5 py-1 text-xs font-bold rounded-full border ${next.traffic.color}">${next.traffic.label}</span>
+          <span class="text-[11px] text-emerald-100 font-mono">
+            途中均速 ${next.route.avg} / <strong class="text-white underline">最低 ${next.route.min.speed} km/h</strong>
+          </span>
+          <span class="text-[10px] text-emerald-100/80">最慢段 K${Math.round(next.route.min.lo)}–K${Math.round(next.route.min.hi)}</span>
+        </div>` : '<span class="px-2.5 py-1 text-xs rounded-full bg-slate-700 text-slate-300">未取得即時速度</span>';
 
-      const card = document.getElementById('next-station-card');
-      const listContainer = document.getElementById('upcoming-list');
+      const etaText = next.traffic
+        ? '依途中各路段即時速度估算 ~' + next.mins + ' 分鐘' + (partial ? '（部分路段無資料）' : '')
+        : '以 ' + DEFAULT_SPEED + ' km/h 估算 ~' + next.mins + ' 分鐘';
 
-      if (upcoming.length > 0) {
-        const next = upcoming[0];
-        const trafficBadge = next.traffic ? `
-          <div class="flex flex-col items-end gap-1">
-            <span class="px-2.5 py-1 text-xs font-bold rounded-full border ${next.traffic.statusColor}">
-              ${next.traffic.label}
-            </span>
-            <span class="text-[11px] text-emerald-100 font-mono">
-              均速 ${next.traffic.avgSpeed} / <strong class="text-white underline">最低 ${next.traffic.minSpeed} km/h</strong>
-            </span>
+      card.innerHTML = `
+        <div class="flex justify-between items-start">
+          <div>
+            <div class="text-xs font-bold uppercase tracking-wider text-emerald-200">Next Rest Area • 即將到達</div>
+            <div class="text-3xl font-black mt-1 mb-1">${next.name} <span class="text-lg font-normal text-emerald-100">(${next.k}K)</span></div>
           </div>
-        ` : `<span class="px-2.5 py-1 text-xs rounded-full bg-slate-700 text-slate-300">未取得即時速</span>`;
+          ${badge}
+        </div>
+        <div class="flex items-baseline gap-3 my-2 flex-wrap">
+          <div><span class="text-4xl font-extrabold">${next.dist}</span> <span class="text-sm">KM</span></div>
+          <div class="text-slate-900 bg-white/90 px-3 py-1 rounded-full text-xs font-bold">${etaText}</div>
+        </div>
+        ${next.note ? '<div class="mt-2 text-xs text-emerald-50/90"><i class="fa-solid fa-circle-info mr-1"></i>' + next.note + '</div>' : ''}
+        ${next.backup ? '<div class="mt-2 text-xs font-bold text-amber-200 bg-amber-900/40 border border-amber-400/40 rounded-lg px-3 py-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i>進站前約 5 公里車速偏低，進站匝道可能回堵</div>' : ''}
+      `;
+      card.className = 'bg-emerald-600 text-white rounded-2xl p-5 shadow-lg relative overflow-hidden transition-all';
 
-        card.innerHTML = `
-          <div class="flex justify-between items-start">
-            <div>
-              <div class="text-xs font-bold uppercase tracking-wider text-emerald-200">Next Rest Area • 即將到達</div>
-              <div class="text-3xl font-black mt-1 mb-1">${next.name} <span class="text-lg font-normal text-emerald-100">(${next.k}K)</span></div>
-            </div>
-            ${trafficBadge}
-          </div>
-
-          <div class="flex items-baseline gap-3 my-2">
-            <div><span class="text-4xl font-extrabold">${next.dist}</span> <span class="text-sm">KM</span></div>
-            <div class="text-slate-900 bg-white/90 px-3 py-1 rounded-full text-xs font-bold">
-              ${next.traffic ? `即時路況保守估計 ~${next.mins} 分鐘` : `速限100km估算 ~${next.mins} 分鐘`}
-            </div>
-          </div>
-        `;
-        card.className = "bg-emerald-600 text-white rounded-2xl p-5 shadow-lg relative overflow-hidden transition-all";
-
-        if(upcoming.length > 1) {
-          listContainer.innerHTML = upcoming.slice(1).map(s => {
-            const tTag = s.traffic ? `
-              <div class="flex items-center gap-1.5">
-                <span class="text-[10px] px-2 py-0.5 rounded border ${s.traffic.statusColor}">
-                  ${s.traffic.label}
-                </span>
-                <span class="text-[10px] text-slate-400 font-mono">
-                  (最慢 <strong class="text-slate-200">${s.traffic.minSpeed} km/h</strong>)
-                </span>
-              </div>
-            ` : `<span class="text-[10px] px-2 py-0.5 rounded border border-slate-700 bg-slate-800 text-slate-400">速限 100km</span>`;
-
-            return `
-              <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-700/50 space-y-2">
-                <div class="flex justify-between items-center">
-                  <div class="font-bold text-white flex flex-col gap-1">
-                    <span>${s.name}</span>
-                    ${tTag}
-                  </div>
-                  <div class="text-right">
-                    <span class="text-emerald-400 font-extrabold text-sm">${s.dist} km</span>
-                    <span class="text-xs text-slate-400 ml-1">(~${s.mins} 分鐘)</span>
-                  </div>
+      if (upcoming.length > 1) {
+        listContainer.innerHTML = upcoming.slice(1).map(s => {
+          const tTag = s.traffic ? `
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="text-[10px] px-2 py-0.5 rounded border ${s.traffic.color}">${s.traffic.label}</span>
+              <span class="text-[10px] text-slate-400 font-mono">(途中最低 <strong class="text-slate-200">${s.route.min.speed} km/h</strong>)</span>
+              ${s.backup ? '<span class="text-[10px] text-amber-300"><i class="fa-solid fa-triangle-exclamation"></i> 進站前車速低</span>' : ''}
+            </div>` : '<span class="text-[10px] px-2 py-0.5 rounded border border-slate-700 bg-slate-800 text-slate-400">無即時速度，以 ' + DEFAULT_SPEED + ' km/h 估算</span>';
+          return `
+            <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-700/50 space-y-2">
+              <div class="flex justify-between items-center">
+                <div class="font-bold text-white flex flex-col gap-1">
+                  <span>${s.name}</span>
+                  ${tTag}
                 </div>
-                <div class="flex justify-between items-center text-xs text-slate-400 pt-1 border-t border-slate-800">
-                  <span>里程：${s.k} K</span>
+                <div class="text-right">
+                  <span class="text-emerald-400 font-extrabold text-sm">${s.dist} km</span>
+                  <span class="text-xs text-slate-400 ml-1">(~${s.mins} 分鐘)</span>
                 </div>
               </div>
-            `;
-          }).join('');
-        } else {
-          listContainer.innerHTML = `<div class="text-xs text-slate-500 text-center py-2">無更多後續休息站</div>`;
-        }
+              <div class="flex justify-between items-center text-xs text-slate-400 pt-1 border-t border-slate-800">
+                <span>里程：${s.k} K</span>
+                ${s.note ? '<span class="text-right text-slate-500">' + s.note + '</span>' : ''}
+              </div>
+            </div>`;
+        }).join('');
       } else {
-        card.innerHTML = `
-          <div class="text-lg font-bold">前方方向已無休息站</div>
-          <div class="text-xs text-slate-200 mt-1">您已通過該國道當前方向的所有休息站。</div>
-        `;
-        card.className = "bg-slate-700 text-white rounded-2xl p-5 shadow-lg transition-all";
-        listContainer.innerHTML = `<div class="text-xs text-slate-500 text-center py-2">--</div>`;
+        listContainer.innerHTML = '<div class="text-xs text-slate-500 text-center py-2">無更多後續休息站</div>';
       }
     }
+
+    // ============ 啟動：只抓一次（有快取就直接用），之後不自動輪詢 ============
+    document.addEventListener('DOMContentLoaded', () => {
+      const savedId = localStorage.getItem('tdx_client_id') || '';
+      const savedSecret = localStorage.getItem('tdx_client_secret') || '';
+      if (savedId) $('tdx-client-id').value = savedId;
+      if (savedSecret) $('tdx-client-secret').value = savedSecret;
+
+      currentDir = ($('direction-select').value === '1') ? 'north' : 'south';
+      updateView();
+      refresh(false);
+      setTimeout(() => getLocationOnce(true), 500);
+    });
   </script>
 </body>
 </html>
