@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>雙人對決</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f3f5fb;--card:#fff;--tx:#1a2033;--mu:#6b7490;--ln:#dde2f0;--c1:#ff5d73;--c2:#2f80ed;color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1320;--card:#1a2033;--tx:#eef1fa;--mu:#9aa3c0;--ln:#2b3350;--c1:#ff7a8c;--c2:#5aa0ff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1320;--card:#1a2033;--tx:#eef1fa;--mu:#9aa3c0;--ln:#2b3350;--c1:#ff7a8c;--c2:#5aa0ff;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{height:100%}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;-webkit-user-select:none;user-select:none}
+#app{height:100%}
+body{touch-action:manipulation}
+.bar{width:min(80%,320px);height:14px;border-radius:9px;background:var(--ln);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--pc)}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;max-width:380px}
+.opt{padding:clamp(8px,2.2dvh,16px) 4px;border:3px solid var(--pc);background:var(--card);border-radius:16px;font-weight:800;font-size:17px}
+.opt:active{background:var(--pc);color:#fff}
+.bg2 i.lb{display:flex;align-items:center;justify-content:center;font:800 14px system-ui,sans-serif;color:var(--mu)}
+.bg2 button.hit{background:#e03131;border-color:#e03131}
+.bg2 button.ms{background:var(--ln);color:var(--mu)}
+.chip.nt1{opacity:.45;text-decoration:line-through}
+.chip.nt2{border-color:#2f9e44;color:#2f9e44}
+.hr{display:flex;gap:10px;align-items:center;background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:8px 12px;margin:6px 0}
+.gn{font-size:22px;font-weight:900;letter-spacing:.15em}
+.hr .r{margin-left:auto;font-weight:800}
+button{font:inherit;color:inherit;cursor:pointer}
+.menu{max-width:520px;margin:0 auto;padding:14px 16px 40px}
+.ttl{font-size:28px;font-weight:900;margin:6px 0 4px}
+.mu{color:var(--mu);font-size:14px;margin:4px 0}
+h3{font-size:14px;color:var(--mu);margin:22px 0 8px}
+.names{display:flex;gap:8px;align-items:center;margin-top:14px}
+.names span{font-weight:900;color:var(--mu)}
+input[type=text],textarea{font:inherit;color:var(--tx);background:var(--card);border:2px solid var(--ln);border-radius:12px;padding:10px 12px;min-width:0;width:100%;-webkit-user-select:text;user-select:text}
+#n1{border-color:var(--c1)}#n2{border-color:var(--c2)}
+textarea{height:130px;resize:vertical}
+.score{display:flex;align-items:center;justify-content:center;gap:14px;margin:16px 0 0;font-size:18px}
+.score .sc{font-size:34px;font-weight:900}
+.score b:first-child{color:var(--c1)}.score b:last-child{color:var(--c2)}
+.lnk{border:0;background:none;color:var(--mu);font-size:13px;text-decoration:underline;display:block;margin:2px auto 0}
+.chip{display:inline-block;padding:8px 14px;margin:0 6px 6px 0;border-radius:99px;border:2px solid var(--ln);background:var(--card);font-weight:700}
+.chip.on{background:var(--tx);color:var(--bg);border-color:var(--tx)}
+.gc{display:flex;gap:14px;align-items:center;width:100%;text-align:left;background:var(--card);border:2px solid var(--ln);border-radius:18px;padding:14px 16px;margin-bottom:10px}
+.gc i{font-style:normal;font-size:34px}.gc b{font-size:18px;display:block}.gc small{color:var(--mu)}
+.gc:active{transform:scale(.98)}
+.arena{height:100%;display:flex;flex-direction:column}
+.half{position:relative;flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:8px 14px}
+.p1{--pc:var(--c1);background:rgba(255,93,115,.13)}
+.p2{--pc:var(--c2);background:rgba(47,128,237,.13);transform:rotate(180deg)}
+.hd{display:flex;justify-content:space-between;align-items:baseline;color:var(--pc);font-size:14px}
+.hd b{font-size:19px}
+.bd{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;min-height:0}
+.mid{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;min-height:56px;background:var(--card);border-top:2px solid var(--ln);border-bottom:2px solid var(--ln)}
+.mid .t{flex:1;text-align:center;font-weight:700}
+.mc{flex:1;display:flex;align-items:center;justify-content:center;gap:12px}
+.num{font-size:38px;font-weight:900;min-width:60px;text-align:center}
+.x{border:2px solid var(--ln);background:var(--card);border-radius:12px;padding:8px 12px;font-weight:700}
+.x.on{background:var(--tx);color:var(--bg)}
+.btn{border:0;border-radius:14px;padding:12px 20px;font-weight:800;background:var(--pc,var(--tx));color:#fff}
+.mid .btn{background:var(--tx);color:var(--bg)}
+.row{display:flex;gap:10px;width:100%;max-width:420px}
+.pick{flex:1;font-size:clamp(34px,8dvh,52px);padding:clamp(8px,2dvh,18px) 0;border:3px solid var(--pc);background:var(--card);border-radius:20px}
+.pick:active{background:var(--pc)}
+.vs{font-size:clamp(34px,8dvh,52px)}.vs small{font-size:14px;color:var(--mu);margin:0 8px}
+.tg{font-size:20px}.tg b{font-size:40px;color:var(--pc)}
+.stop{width:min(80%,320px);font-size:26px;font-weight:900;padding:clamp(14px,4dvh,32px) 0;border:0;border-radius:22px;background:var(--pc);color:#fff}
+.zone{width:100%;flex:1;max-height:70%;border-radius:22px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:26px;font-weight:900;color:#fff}
+.wait{background:#e03131}.go{background:#2f9e44}
+.bg{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;width:min(80vw,32dvh)}
+.bg i{font-style:normal;aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;background:var(--card);border:2px solid var(--ln);font-weight:800;font-size:clamp(13px,3.6dvh,22px)}
+.bg i.mk{background:var(--pc);color:#fff;border-color:var(--pc)}
+.end{position:absolute;inset:0;background:rgba(15,19,32,.93);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;padding:14px;z-index:3}
+.end .big{font-size:clamp(36px,8dvh,52px);line-height:1.1}
+.end h2{margin:0;font-size:26px}
+.end p{margin:2px 0;font-size:15px}
+.end .pun{font-size:19px;font-weight:800;color:#ffd43b}
+.end .btn{margin-top:8px;background:#fff;color:#1a2033}
+.eg,.bg2{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.eg input{padding:10px 2px;text-align:center;font-size:16px;font-weight:700;border-radius:10px}
+.pb{position:relative;margin:12px 0}
+.bg2 button{aspect-ratio:1;border:2px solid var(--ln);background:var(--card);border-radius:12px;font-weight:800;font-size:clamp(15px,5vw,24px);padding:0;overflow:hidden;word-break:break-all;line-height:1.1}
+.bg2 button.mk{background:var(--c2);border-color:var(--c2);color:#fff}
+.pb svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.pb line{stroke:var(--c1);stroke-width:.12;stroke-linecap:round;opacity:.85}
+.brow{display:flex;gap:8px;margin:10px 0}.brow .x{flex:1}.brow input{flex:1}
+.st{display:flex;align-items:center;justify-content:space-between}
+.sc2{font-size:42px;font-weight:900}.sc2 small{font-size:14px;color:var(--mu)}
+.btn.wide{width:100%}
+#toast{position:fixed;left:50%;bottom:calc(30px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:8px 16px;border-radius:99px;font-size:14px;z-index:10;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast"></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ri=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const shuf=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=ri(0,i);[a[i],a[j]]=[a[j],a[i]]}return a};
+const KEY='duoGames.v1';
+const STK=['洗碗一次','按摩 5 分鐘','請喝一杯飲料','倒垃圾','說一句真心話','學動物叫三聲','決定今晚吃什麼','幫對方捶背','做 10 下深蹲','唱一首歌'];
+let S=null;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!S.n)S={n:['我','她'],t:[0,0],stakes:STK.join('\n'),need:2};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const nm=p=>esc(S.n[p-1]||('玩家'+p));
+let view='menu',G=null,armed=null;
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('on'),1800)}
+function ask(k){if(armed===k)return true;armed=k;toast('再按一次確認');setTimeout(()=>{armed=null},3000);return false}
+const PUN=false; // 懲罰機制先隱藏，改成 true 即可重新啟用
+function stake(){if(!PUN)return '';const l=S.stakes.split('\n').map(s=>s.trim()).filter(Boolean);return l.length?l[ri(0,l.length-1)]:''}
+function clean(){if(G){clearTimeout(G.tm);clearInterval(G.iv)}}
+function finish(w){clean();if(w){S.t[w-1]++;save()}G.final={w,pun:w?stake():''};try{navigator.vibrate&&navigator.vibrate([80,50,160])}catch(e){}}
+
+function banner(p){
+  const f=G.final,me=f.w===p,tie=!f.w,d=GAMES[view].detail?GAMES[view].detail(p):'';
+  return `<div class="end"><div class="big">${tie?'🤝':me?'🏆':'😈'}</div><h2>${G.ttl||(tie?'平手':me?'你贏了！':'你輸了')}</h2>${d?`<p>${d}</p>`:''}${f.pun?`<p class="pun">${me?nm(3-p)+' 要：':'懲罰：'}${esc(f.pun)}</p>`:''}<button class="btn" data-a="again">再來一場</button></div>`;
+}
+function half(p,body){
+  const sc=G.s?`本場 ${G.s[p-1]}　`:'';
+  return `<div class="half p${p}"><div class="hd"><b>${nm(p)}</b><span>${sc}累計 ${S.t[p-1]} 勝</span></div><div class="bd">${body}</div>${G.final?banner(p):''}</div>`;
+}
+const menuBtn='<button class="x" data-a="menu">☰ 選單</button>';
+const midT=t=>`<div class="mid">${menuBtn}<div class="t">${t}</div><span style="width:78px"></span></div>`;
+
+/* ---------- 猜拳 ---------- */
+const E={r:'✊',s:'✌️',p:'✋'},BEAT={r:'s',s:'p',p:'r'};
+function rpsStart(){G={s:[0,0],c:[null,null],ph:'pick',n:1,need:S.need,final:null}}
+function rpsReveal(){
+  const [a,b]=G.c,w=a===b?0:BEAT[a]===b?1:2;
+  G.w=w;G.ph='show';if(w)G.s[w-1]++;
+  if(w&&G.s[w-1]>=G.need)finish(w);
+}
+/* ---------- 盲數秒數 ---------- */
+function blindStart(){G={tg:ri(5,12),ph:'ready',t:[null,null],start:0,final:null}}
+function bstop(p){
+  if(G.ph!=='run'||G.t[p-1]!=null)return;
+  G.t[p-1]=(performance.now()-G.start)/1000;
+  if(G.t[0]!=null&&G.t[1]!=null){
+    G.ph='done';const d=G.t.map(t=>+Math.abs(t-G.tg).toFixed(2));
+    finish(d[0]===d[1]?0:d[0]<d[1]?1:2);
+  }
+}
+/* ---------- 反應大賽 ---------- */
+function reactWait(){
+  G.ph='wait';G.foul=false;
+  G.tm=setTimeout(()=>{if(G&&G.ph==='wait'){G.ph='go';G.t0=performance.now();render()}},ri(2000,6000));
+}
+function reactStart(){G={s:[0,0],ph:'wait',n:1,need:S.need,final:null};reactWait()}
+function rtap(p){
+  if(G.ph!=='wait'&&G.ph!=='go')return;
+  clearTimeout(G.tm);
+  if(G.ph==='wait'){G.foul=true;G.w=3-p}else{G.foul=false;G.w=p;G.ms=performance.now()-G.t0}
+  G.ph='show';G.s[G.w-1]++;
+  if(G.s[G.w-1]>=G.need)finish(G.w);
+}
+/* ---------- 賓果（各自一張盤面，輪流喊數字） ---------- */
+const LN=[];for(let i=0;i<5;i++)LN.push([0,1,2,3,4].map(k=>i*5+k),[0,1,2,3,4].map(k=>k*5+i));
+LN.push([0,6,12,18,24],[4,8,12,16,20]);
+const R25=Array.from({length:25},(_,i)=>i+1);
+const newBingo=()=>({cells:shuf(R25).map(String),marks:Array(25).fill(false),playing:false,turn:0,won:false,seen:false});
+const B=()=>S.bingo||(S.bingo=newBingo());
+const fullLines=b=>LN.filter(l=>l.every(c=>b.marks[c]));
+function bgMark(i){
+  const b=B();
+  if(b.marks[i])b.marks[i]=false;
+  else{b.marks[i]=true;b.turn=1-b.turn;
+    if(fullLines(b).length>=5&&!b.seen){b.won=true;try{navigator.vibrate&&navigator.vibrate([80,50,160])}catch(e){}}}
+  save();render();
+}
+function bgFind(){
+  const t=($('#mk').value||'').trim();if(!t)return;
+  const i=B().cells.indexOf(t);
+  if(i<0){toast('盤面上沒有「'+t+'」');return}
+  if(B().marks[i]){toast('這格已經圈過了');return}
+  bgMark(i);
+}
+function bgUI(){
+  const b=B(),fl=fullLines(b),n=fl.length;
+  const top=`<div class="mid" style="border:0;background:none;padding:0 0 8px">${menuBtn}<div class="t">🎱 賓果</div><span style="width:78px"></span></div>`;
+  if(!b.playing){
+    return `<div class="menu">${top}<p class="mu">每格填一個數字或詞（最多 6 字），25 格不能重複。可以先按隨機再微調。</p>
+    <div class="eg">${b.cells.map((c,i)=>`<input type="text" class="ci" data-i="${i}" value="${esc(c)}" maxlength="6">`).join('')}</div>
+    <div class="brow"><button class="x" data-a="bgrand">🎲 隨機 1–25</button><button class="x" data-a="bgclr">🧹 清空</button></div>
+    <button class="btn wide" data-a="bgplay" style="background:var(--tx);color:var(--bg)">✅ 開始遊戲</button></div>`;
+  }
+  const sv=fl.map(l=>`<line x1="${l[0]%5+.5}" y1="${Math.floor(l[0]/5)+.5}" x2="${l[4]%5+.5}" y2="${Math.floor(l[4]/5)+.5}"/>`).join('');
+  return `<div class="menu">${top}
+  <div class="st"><div class="sc2">${n} <small>/ 5 條線</small></div><button class="x" data-a="bgturn">輪到 <b>${nm(b.turn+1)}</b> 喊</button></div>
+  <div class="pb"><div class="bg2">${b.cells.map((c,i)=>`<button class="${b.marks[i]?'mk':''}" data-a="bgcell" data-v="${i}">${esc(c)}</button>`).join('')}</div><svg viewBox="0 0 5 5" preserveAspectRatio="none">${sv}</svg></div>
+  <div class="brow"><input type="text" id="mk" inputmode="numeric" placeholder="輸入喊到的數字"><button class="btn" data-a="bgmark" style="background:var(--tx);color:var(--bg)">圈選</button></div>
+  <div class="brow"><button class="x" data-a="bgnew">🔄 新一局</button><button class="x" data-a="bgedit">✏️ 改盤面</button></div>
+  ${b.won&&!b.seen&&n>=5?`<div class="end" style="position:fixed"><div class="big">🎉</div><h2>BINGO！</h2><p>${n} 條線連成了</p><button class="btn" data-a="bgclose">看盤面</button><button class="btn" data-a="bgnew">新一局</button></div>`:''}</div>`;
+}
+
+/* ---------- 1A2B ---------- */
+const topBar=t=>`<div class="mid" style="border:0;background:none;padding:0 0 8px">${menuBtn}<div class="t">${t}</div><span style="width:78px"></span></div>`;
+function abSecret(code){
+  let h=0;for(const c of code)h=(Math.imul(h,31)+c.charCodeAt(0))|0;
+  const r=code?()=>{h=(h+0x9E3779B9)|0;let t=Math.imul(h^h>>>16,0x85ebca6b);t=Math.imul(t^t>>>13,0xc2b2ae35);return((t^t>>>16)>>>0)/4294967296}:Math.random;
+  const d=[0,1,2,3,4,5,6,7,8,9];
+  for(let i=9;i>0;i--){const j=Math.floor(r()*(i+1));[d[i],d[j]]=[d[j],d[i]]}
+  return d.slice(0,4).join('');
+}
+const abFb=(g,s)=>{let a=0,b=0;for(let i=0;i<4;i++)if(g[i]===s[i])a++;else if(s.includes(g[i]))b++;return[a,b]};
+const abNew=(mode,code)=>({mode,code,sec:abSecret(code),h:[],n:Array(10).fill(0),turn:0,done:false,show:false});
+const AB=()=>S.ab||(S.ab=abNew('solo',''));
+function abGuess(){
+  const b=AB(),g=($('#ag').value||'').trim();
+  if(b.done)return;
+  if(!/^\d{4}$/.test(g)||new Set(g).size<4){toast('請輸入 4 個不重複的數字');return}
+  if(b.h.some(x=>x.g===g)){toast('這組猜過了');return}
+  const [a,c]=abFb(g,b.sec);b.h.unshift({g,a,b:c,w:b.turn});
+  if(a===4){b.done=true;if(b.mode==='duo')S.t[b.turn]++}
+  else if(b.mode==='duo')b.turn=1-b.turn;
+  save();render();
+}
+function abUI(){
+  const b=AB();
+  return `<div class="menu">${topBar('🔢 1A2B')}
+  <div class="brow"><span class="chip ${b.mode==='solo'?'on':''}" data-a="abmode" data-v="solo">單人</span><span class="chip ${b.mode==='duo'?'on':''}" data-a="abmode" data-v="duo">雙人輪流</span></div>
+  <div class="brow"><input type="text" id="ac" value="${esc(b.code)}" placeholder="題目代碼（選填）"><button class="x" data-a="abnew">出新題</button></div>
+  <p class="mu">${b.mode==='duo'&&!b.done?`輪到 <b>${nm(b.turn+1)}</b> 猜。`:''}A＝數字和位置都對，B＝數字對但位置不對。兩支手機輸入相同代碼就是同一題，換代碼才會換題。</p>
+  <div class="brow"><input type="text" id="ag" inputmode="numeric" maxlength="4" placeholder="輸入 4 位不重複數字"><button class="btn" data-a="abgo" style="background:var(--tx);color:var(--bg)">猜</button></div>
+  <h3>數字筆記（點一下切換：○ 未知 → ✗ 排除 → ✓ 確定有）</h3>
+  <div>${b.n.map((x,d)=>`<span class="chip nt${x}" data-a="abnote" data-v="${d}">${d} ${['○','✗','✓'][x]}</span>`).join('')}</div>
+  <h3>猜測紀錄（共 ${b.h.length} 次）</h3>
+  <div>${b.h.map((x,i)=>`<div class="hr"><b>#${b.h.length-i}</b>${b.mode==='duo'?`<span>${nm(x.w+1)}</span>`:''}<span class="gn">${x.g}</span><span class="r">${x.a}A${x.b}B</span></div>`).join('')||'<p class="mu">還沒猜過</p>'}</div>
+  <button class="lnk" data-a="abgive">放棄，看答案</button>
+  ${b.done||b.show?`<div class="end" style="position:fixed"><div class="big">${b.done?'🎉':'🏳️'}</div><h2>${b.done?'猜中了！':'答案是'}</h2><p class="gn">${b.sec}</p><p>${b.done?(b.mode==='duo'?nm(b.h[0].w+1)+' 贏了，':'')+'共猜了 '+b.h.length+' 次':''}</p><button class="btn" data-a="abnew">再來一題</button></div>`:''}</div>`;
+}
+/* ---------- 戰艦 ---------- */
+const SH=()=>S.sh||(S.sh={ph:'setup',ships:Array(36).fill(false),got:Array(36).fill(false),shots:Array(36).fill(0),tab:0,seen:false});
+function shGrid(fn){
+  let h='<i></i>'+[...'ABCDEF'].map(c=>`<i class="lb">${c}</i>`).join('');
+  for(let r=0;r<6;r++){h+=`<i class="lb">${r+1}</i>`;for(let c=0;c<6;c++)h+=fn(r*6+c)}
+  return `<div class="bg2" style="grid-template-columns:repeat(7,1fr)">${h}</div>`;
+}
+function shUI(){
+  const x=SH(),n=x.ships.filter(Boolean).length;
+  if(x.ph==='setup')return `<div class="menu">${topBar('🚢 戰艦')}<p class="mu">在 6×6 海域點格子擺艦隊，剛好 8 格，形狀隨意。已放 <b>${n}</b> / 8</p>
+  ${shGrid(i=>`<button class="${x.ships[i]?'mk':''}" data-a="shset" data-v="${i}">${x.ships[i]?'🚢':''}</button>`)}
+  <div class="brow"><button class="x" data-a="shrand">🎲 隨機擺放</button><button class="x" data-a="shclr">🧹 清空</button></div>
+  <button class="btn wide" data-a="shgo" style="background:var(--tx);color:var(--bg)">⚓ 開戰</button></div>`;
+  const hitMe=x.ships.filter((v,i)=>v&&x.got[i]).length,hits=x.shots.filter(v=>v===1).length;
+  const grid=x.tab===0?shGrid(i=>`<button class="${x.got[i]?(x.ships[i]?'hit':'ms'):x.ships[i]?'mk':''}" data-a="shgot" data-v="${i}">${x.got[i]?(x.ships[i]?'💥':'💧'):x.ships[i]?'🚢':''}</button>`)
+    :shGrid(i=>`<button class="${['','hit','ms'][x.shots[i]]}" data-a="shshot" data-v="${i}">${['','💥','💧'][x.shots[i]]}</button>`);
+  const over=!x.seen&&(hits>=8||hitMe>=8);
+  return `<div class="menu">${topBar('🚢 戰艦')}
+  <div class="brow"><span class="chip ${x.tab===0?'on':''}" data-a="shtab" data-v="0">🛡 我的艦隊</span><span class="chip ${x.tab===1?'on':''}" data-a="shtab" data-v="1">🎯 攻擊紀錄</span></div>
+  <p class="mu">${x.tab===0?`對方喊座標時，點那一格（自動判斷中或沒中）。我方剩 <b>${8-hitMe}</b> 格`:`你喊座標、對方回答後點格子：○ → 💥中 → 💧沒中。已擊中 <b>${hits}</b> / 8`}</p>
+  ${grid}
+  <div class="brow"><button class="x" data-a="shnew">🔄 新一局</button></div>
+  ${over?`<div class="end" style="position:fixed"><div class="big">${hits>=8?'🎉':'💀'}</div><h2>${hits>=8?'你贏了！擊沉全部敵艦':'艦隊全滅，你輸了'}</h2><button class="btn" data-a="shclose">看盤面</button><button class="btn" data-a="shnew">新一局</button></div>`:''}</div>`;
+}
+const UI={bingo:bgUI,ship:shUI,ab:abUI};
+const GAMES={
+  rps:{start:rpsStart,
+    body(p){
+      const i=p-1,j=1-i;let h='';
+      if(G.ph==='pick'){
+        h=G.c[i]==null?`<p>出拳！（對方看不到）</p><div class="row">${['r','s','p'].map(k=>`<button class="pick" data-a="rps" data-p="${p}" data-v="${k}">${E[k]}</button>`).join('')}</div>`:'<p>✅ 已出拳，等對方…</p>';
+      }else{
+        h=`<div class="vs">${E[G.c[i]]}<small>VS</small>${E[G.c[j]]}</div><h2>${G.w===0?'這局平手':G.w===p?'這局你贏 ✅':'這局你輸 ❌'}</h2>`+(G.final?'':'<button class="btn" data-a="rnext">下一局</button>');
+      }
+      return h;
+    },
+    mid(){return midT(`先贏 ${G.need} 局　第 ${G.n} 局`)},
+    detail(p){return `${E[G.c[p-1]]} VS ${E[G.c[2-p]]}　${G.s[p-1]} : ${G.s[2-p]}`}
+  },
+  blind:{start:blindStart,
+    body(p){
+      const i=p-1,j=1-i,f=t=>t.toFixed(2),df=t=>(t-G.tg>=0?'+':'')+(t-G.tg).toFixed(2);
+      if(G.ph==='ready')return `<div class="tg">目標 <b>${G.tg}</b> 秒</div><p class="mu">開始後秒數會被蓋住，心裡默數，到了就按停</p><button class="btn" data-a="bstart" style="background:var(--pc)">▶ 開始（任一人按）</button>`;
+      if(G.ph==='run')return `<div class="tg">目標 <b>${G.tg}</b> 秒</div>`+(G.t[i]==null?`<button class="stop" data-a="bstop" data-p="${p}">🛑 停！</button>`:'<p>✅ 已停，等對方…</p>');
+      return `<div class="tg">目標 ${G.tg} 秒</div>`;
+    },
+    mid(){return midT(`目標 ${G.tg} 秒`)},
+    detail(p){const i=p-1,j=1-i,f=t=>t.toFixed(2),df=t=>(t-G.tg>=0?'+':'')+(t-G.tg).toFixed(2);
+      return `目標 ${G.tg} 秒<br>你：${f(G.t[i])} 秒（${df(G.t[i])}）<br>對方：${f(G.t[j])} 秒（${df(G.t[j])}）`}
+  },
+  react:{start:reactStart,
+    body(p){
+      if(G.ph==='wait')return `<div class="zone wait" data-a="rtap" data-p="${p}">⏳ 等綠燈…<br>別搶先！</div>`;
+      if(G.ph==='go')return `<div class="zone go" data-a="rtap" data-p="${p}">按！！</div>`;
+      const me=G.w===p;
+      return `<h2>${me?'這局你贏 ✅':'這局你輸 ❌'}</h2><p>${G.foul?(me?'對方搶先按了！':'你搶先按了…'):Math.round(G.ms)+' 毫秒'}</p>`+(G.final?'':'<button class="btn" data-a="rnext2">下一局</button>');
+    },
+    mid(){return midT(`先贏 ${G.need} 局　第 ${G.n} 局`)},
+    detail(p){return `${G.s[p-1]} : ${G.s[2-p]}`}
+  }
+};
+GAMES.tug={start(){G={pos:0,final:null}},
+  body(p){const pc=Math.round((p===1?10-G.pos:10+G.pos)/20*100);return `<div class="bar"><i style="width:${pc}%"></i></div><button class="stop" data-a="tug" data-p="${p}">👊 狂點！</button>`},
+  mid(){return midT('先把繩子拉到自己那邊')},
+  detail(){return '拔河結束'}};
+const QS='晚餐想吃？,中式,日式,西式,火鍋|假日想去哪？,山上,海邊,市區,在家|比較想要？,早睡,熬夜,早起,賴床|旅行偏好？,自由行,跟團,露營,住飯店|最愛的飲料？,手搖,咖啡,汽水,白開水|吃飯偏好？,多吃肉,多吃菜,吃麵,吃飯|看電影想看？,動作,愛情,喜劇,恐怖|約會想做？,看電影,逛街,運動,宅在家|天氣偏好？,晴天,雨天,陰天,涼爽|甜點選哪個？,蛋糕,冰淇淋,布丁,不吃甜'.split('|').map(q=>q.split(','));
+GAMES.qa={start(){G={qs:shuf(QS).slice(0,10),i:0,a:[null,null],ph:'pick',sc:0,final:null}},
+  body(p){const i=p-1,[q,...o]=G.qs[G.i];
+    if(G.ph==='pick')return `<h2>${q}</h2>`+(G.a[i]==null?`<div class="opts">${o.map((t,k)=>`<button class="opt" data-a="qa" data-p="${p}" data-v="${k}">${t}</button>`).join('')}</div>`:'<p>✅ 已選，等對方…</p>');
+    return `<h2>${q}</h2><p>你：<b>${o[G.a[i]]}</b>　對方：<b>${o[G.a[1-i]]}</b></p><h2>${G.a[0]===G.a[1]?'默契！+1 💕':'不一樣～'}</h2>`+(G.final?'':'<button class="btn" data-a="qnext">下一題</button>')},
+  mid(){return midT(`第 ${G.i+1}/10 題　默契 ${G.sc} 分`)},
+  detail(){return `默契 ${G.sc} / 10`}};
+const LIST=[['rps','✊','猜拳','同時亮拳，不能偷看，先贏幾局由賽制決定'],['blind','⏱','盲數秒數','畫面蓋住，心裡默數，誰最接近目標秒數'],['react','⚡','反應大賽','綠燈亮了才能按，搶按就輸'],['bingo','🎱','自訂賓果','自己編 5×5 盤面（可隨機），輪流喊數字圈選，先連成 5 條線，各用各的手機也能玩'],
+  ['tug','👊','拔河大賽','各自狂點自己那半邊，先把繩子拉過去'],['qa','💕','默契問答','同時選答案，選一樣就得分，看看默契幾分'],['ship','🚢','戰艦','6×6 海域擺 8 格艦隊，輪流喊座標，各用各的手機'],['ab','🔢','1A2B 猜數字','猜 4 位不重複數字，有紀錄和筆記，單人或雙人輪流']];
+
+function menu(){
+  return `<div class="menu"><h1 class="ttl">🎮 雙人對決</h1>
+  <p class="mu">猜拳、秒數、反應：手機平放在桌上，兩人面對面（上半部倒過來給對面的人看）。賓果：各用各的手機也能玩。</p>
+  <div class="names"><input type="text" id="n1" value="${esc(S.n[0])}" maxlength="8" placeholder="玩家 1"><span>VS</span><input type="text" id="n2" value="${esc(S.n[1])}" maxlength="8" placeholder="玩家 2"></div>
+  <div class="score"><b>${nm(1)}</b><span class="sc">${S.t[0]} : ${S.t[1]}</span><b>${nm(2)}</b></div>
+  <button class="lnk" data-a="rscore">清空累計戰績</button>
+  <h3>賽制（猜拳、反應大賽）</h3>
+  ${[[2,'三戰兩勝'],[3,'五戰三勝'],[4,'七戰四勝']].map(([v,t])=>`<span class="chip ${S.need===v?'on':''}" data-a="need" data-v="${v}">${t}</span>`).join('')}
+  <h3>選一個遊戲</h3>
+  ${LIST.map(([k,e,t,d])=>`<button class="gc" data-a="play" data-v="${k}"><i>${e}</i><span><b>${t}</b><small>${d}</small></span></button>`).join('')}
+  ${PUN?'<h3>輸的人要…（一行一個，贏家揭曉時隨機抽一個）</h3>':''}
+  ${PUN?`<textarea id="stk">${esc(S.stakes)}</textarea>`:''}</div>`;
+}
+function render(){
+  if(view==='menu'){$('#app').innerHTML=menu();return}
+  if(UI[view]){$('#app').innerHTML=UI[view]();return}
+  const g=GAMES[view];
+  $('#app').innerHTML=`<div class="arena">${half(2,g.body(2))}${g.mid()}${half(1,g.body(1))}</div>`;
+}
+function act(a,v,p){
+  p=+p;
+  switch(a){
+    case 'play':view=v;if(GAMES[v])GAMES[v].start();render();break;
+    case 'again':clean();GAMES[view].start();render();break;
+    case 'menu':clean();G=null;view='menu';render();window.scrollTo(0,0);break;
+    case 'need':S.need=+v;save();render();break;
+    case 'rscore':if(ask('rs')){S.t=[0,0];save();render()}break;
+    case 'rps':if(G.ph==='pick'&&G.c[p-1]==null){G.c[p-1]=v;if(G.c[0]&&G.c[1])rpsReveal();render()}break;
+    case 'rnext':G.c=[null,null];G.ph='pick';G.n++;render();break;
+    case 'bstart':if(G.ph==='ready'){G.ph='run';G.start=performance.now();render()}break;
+    case 'bstop':bstop(p);render();break;
+    case 'rtap':rtap(p);render();break;
+    case 'rnext2':G.n++;reactWait();render();break;
+    case 'tug':if(!G.final){G.pos+=p===1?-1:1;if(Math.abs(G.pos)>=10)finish(G.pos<0?1:2);render()}break;
+    case 'qa':if(G.ph==='pick'&&G.a[p-1]==null){G.a[p-1]=+v;if(G.a[0]!=null&&G.a[1]!=null){G.ph='show';if(G.a[0]===G.a[1])G.sc++;if(G.i>=9){G.ttl='默契 '+G.sc+' / 10';finish(0)}}render()}break;
+    case 'qnext':G.i++;G.a=[null,null];G.ph='pick';render();break;
+    case 'abmode':{const b=AB();b.mode=v;b.turn=0;save();render();break}
+    case 'abnew':{const c=($('#ac')||{value:''}).value.trim();S.ab=abNew(AB().mode,c);save();render();break}
+    case 'abgo':abGuess();break;
+    case 'abnote':{const b=AB(),g=$('#ag').value;b.n[+v]=(b.n[+v]+1)%3;save();render();$('#ag').value=g;break}
+    case 'abgive':AB().show=true;save();render();break;
+    case 'shset':{const x=SH(),i=+v;if(!x.ships[i]&&x.ships.filter(Boolean).length>=8){toast('最多 8 格');break}x.ships[i]=!x.ships[i];save();render();break}
+    case 'shrand':{const x=SH();x.ships=Array(36).fill(false);shuf([...Array(36).keys()]).slice(0,8).forEach(i=>x.ships[i]=true);save();render();break}
+    case 'shclr':SH().ships=Array(36).fill(false);save();render();break;
+    case 'shgo':{const x=SH();if(x.ships.filter(Boolean).length!==8){toast('要剛好 8 格才能開戰');break}x.ph='play';x.got=Array(36).fill(false);x.shots=Array(36).fill(0);x.seen=false;x.tab=0;save();render();break}
+    case 'shgot':{const x=SH();x.got[+v]=!x.got[+v];save();render();break}
+    case 'shshot':{const x=SH(),i=+v;x.shots[i]=(x.shots[i]+1)%3;save();render();break}
+    case 'shtab':SH().tab=+v;save();render();break;
+    case 'shclose':SH().seen=true;save();render();break;
+    case 'shnew':{const x=SH();x.ph='setup';x.seen=false;save();render();break}
+    case 'bgrand':B().cells=shuf(R25).map(String);save();render();break;
+    case 'bgclr':B().cells=Array(25).fill('');save();render();break;
+    case 'bgplay':{const b=B(),c=b.cells.map(x=>x.trim());
+      if(c.some(x=>!x)){toast('還有空格沒填');break}
+      const d=c.find((x,i)=>c.indexOf(x)!==i);if(d){toast('「'+d+'」重複了');break}
+      b.cells=c;b.playing=true;b.marks=Array(25).fill(false);b.turn=0;b.won=false;b.seen=false;save();render();break}
+    case 'bgedit':B().playing=false;save();render();break;
+    case 'bgcell':bgMark(+v);break;
+    case 'bgmark':bgFind();break;
+    case 'bgturn':B().turn=1-B().turn;save();render();break;
+    case 'bgnew':{const b=B();b.marks=Array(25).fill(false);b.turn=0;b.won=false;b.seen=false;save();render();break}
+    case 'bgclose':B().seen=true;save();render();break;
+  }
+}
+document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(t)act(t.dataset.a,t.dataset.v,t.dataset.p)});
+document.addEventListener('input',e=>{
+  if(e.target.id==='n1'){S.n[0]=e.target.value;save()}
+  else if(e.target.id==='n2'){S.n[1]=e.target.value;save()}
+  else if(e.target.id==='stk'){S.stakes=e.target.value;save()}
+  else if(e.target.classList.contains('ci')){B().cells[+e.target.dataset.i]=e.target.value;save()}
+});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'){if(e.target.id==='mk')bgFind();else if(e.target.id==='ag')abGuess()}});
+render();
+</script>
+</body>
+</html>
