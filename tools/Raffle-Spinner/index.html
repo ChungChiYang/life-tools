@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>今晚吃什麼？家庭晚餐轉盤</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f1f5f2;--card:#fff;--tx:#1d2b2a;--mu:#6b7f7c;--ac:#d6336c;--ln:#d9e3df;--ok:#2b8a3e;--no:#e03131;color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121c1b;--card:#1b2a28;--tx:#eaf3f0;--mu:#92a9a5;--ac:#ff6b9a;--ln:#2c3f3c;--ok:#69db7c;--no:#ff8787;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121c1b;--card:#1b2a28;--tx:#eaf3f0;--mu:#92a9a5;--ac:#ff6b9a;--ln:#2c3f3c;--ok:#69db7c;--no:#ff8787;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif}
+main{max-width:520px;margin:0 auto;padding:14px 16px 96px}
+.pg{display:none}.pg.on{display:block}
+h1.ttl{font-size:26px;font-weight:900;letter-spacing:.02em;margin:6px 0 12px}
+h3{font-size:14px;font-weight:700;color:var(--mu);margin:20px 0 6px}
+.mu{color:var(--mu);font-size:14px}
+.segs{display:flex;gap:6px;background:var(--ln);padding:4px;border-radius:14px}
+.seg{flex:1;border:0;background:transparent;color:var(--tx);font:inherit;font-weight:700;padding:9px 0;border-radius:11px}
+.seg.on{background:var(--card);box-shadow:0 1px 4px rgba(0,0,0,.18)}
+.ww{position:relative;width:min(88vw,400px);aspect-ratio:1;margin:22px auto 18px}
+#wheel{width:100%;height:100%;display:block;border-radius:50%;box-shadow:0 8px 28px rgba(0,0,0,.28);background:var(--card)}
+.pt{position:absolute;top:-12px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:28px solid var(--tx);z-index:2;filter:drop-shadow(0 2px 2px rgba(0,0,0,.3))}
+#go{position:absolute;left:50%;top:50%;width:68px;height:68px;margin:-34px 0 0 -34px;border-radius:50%;border:4px solid #fff;background:var(--ac);color:#fff;font:900 18px/1 system-ui,sans-serif;z-index:2;box-shadow:0 3px 10px rgba(0,0,0,.35)}
+button:disabled{opacity:.55}
+.btn{display:block;width:100%;border:0;border-radius:14px;padding:13px;font:inherit;font-weight:800;background:var(--ac);color:#fff;margin-top:8px}
+.btn.big{font-size:19px;padding:16px}
+.btn.ghost{background:transparent;color:var(--tx);border:1.5px solid var(--ln)}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:7px 12px;margin:3px 4px 3px 0;border-radius:99px;border:1.5px solid var(--ln);background:var(--card);font-size:15px;user-select:none}
+.chip.on{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:700}
+.chip.pf1{border-color:var(--ok);color:var(--ok);font-weight:700}
+.chip.pf-1{border-color:var(--no);color:var(--no);text-decoration:line-through}
+.dish,.row{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:10px 12px;margin:8px 0}
+.dh,.row{display:flex;align-items:center;gap:8px}
+.dh b{font-size:17px}.dh .x,.row .x{margin-left:auto}
+.tag{font-size:12px;color:var(--mu);border:1px solid var(--ln);border-radius:6px;padding:0 6px}
+.x{border:0;background:transparent;font-size:18px;padding:4px 8px;color:var(--tx)}
+.add{display:flex;gap:6px;flex-wrap:wrap}
+input[type=text],select{font:inherit;color:var(--tx);background:var(--card);border:1.5px solid var(--ln);border-radius:12px;padding:10px 12px;min-width:0}
+input[type=text]{flex:1 1 140px}
+.add .btn{width:auto;margin:0;padding:10px 18px}
+label.ck{display:flex;gap:8px;align-items:center;margin:8px 0}
+.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--ln);padding-bottom:env(safe-area-inset-bottom,0px);z-index:5}
+.tabs button{flex:1;border:0;background:transparent;color:var(--mu);font:inherit;font-size:13px;font-weight:700;padding:9px 0 8px}
+.tabs button.on{color:var(--ac)}
+.tabs span{display:block;font-size:22px;line-height:1.1}
+.md{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:24px;z-index:9}
+.md[hidden]{display:none}
+.mc{background:var(--card);border-radius:22px;padding:24px 22px 18px;width:min(100%,380px);text-align:center}
+.mc h1{font-size:34px;margin:6px 0 4px;font-weight:900;word-break:break-all}
+.mc h2{font-size:26px;margin:4px 0}
+.big{font-size:44px}
+#toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:8px 16px;border-radius:99px;font-size:14px;z-index:10;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<main>
+<section id="p-play" class="pg on">
+  <h1 class="ttl">🍽️ 今晚吃什麼？</h1>
+  <div id="modes" class="segs"></div>
+  <div class="ww"><div class="pt"></div><canvas id="wheel"></canvas><button id="go" data-a="spin">GO</button></div>
+  <button class="btn big" id="spin" data-a="spin">🎡 開始轉！</button>
+  <h3>今天誰在場（點一下切換）</h3><div id="who"></div>
+  <h3>想吃哪一類？（不選＝全部）</h3><div id="cats"></div>
+  <p id="info" class="mu"></p>
+</section>
+
+<section id="p-menu" class="pg">
+  <h1 class="ttl">📋 菜單</h1>
+  <div class="add"><input type="text" id="dn" placeholder="新增餐廳或食物" maxlength="20"><select id="catsel"></select><button class="btn" data-a="addd">新增</button></div>
+  <p class="mu">點家人名字切換：○ 沒意見 → ❤️ 想吃（轉盤格子變大）→ 🚫 不要（在場時直接排除）</p>
+  <div id="dishes"></div>
+</section>
+
+<section id="p-set" class="pg">
+  <h1 class="ttl">👪 設定</h1>
+  <h3>家人</h3>
+  <div id="mems"></div>
+  <div class="add"><select id="me"><option>👨</option><option>👩</option><option>🧒</option><option>👧</option><option>👴</option><option>👵</option><option>🧑</option><option>🐶</option></select><input type="text" id="mn" placeholder="家人名字" maxlength="8"><button class="btn" data-a="addm">新增</button></div>
+  <h3>玩法</h3>
+  <div id="opts"></div>
+  <h3>最近吃過</h3>
+  <div id="hist" class="mu"></div>
+  <button class="btn ghost" data-a="clrh">清空紀錄</button>
+  <button class="btn ghost" data-a="reset">重設為預設菜單</button>
+</section>
+</main>
+
+<nav class="tabs">
+  <button class="on" data-a="tab" data-v="play"><span>🎡</span>轉盤</button>
+  <button data-a="tab" data-v="menu"><span>📋</span>菜單</button>
+  <button data-a="tab" data-v="set"><span>👪</span>設定</button>
+</nav>
+<div class="md" id="md" hidden><div class="mc" id="mc"></div></div>
+<div id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const uid=()=>Math.random().toString(36).slice(2,8);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const KEY='dinnerWheel.v1';
+const CATS=['中式','日式','西式','速食','火鍋燒烤','外送','自煮','其他'];
+const COLORS=['#ff6b6b','#ffa94d','#ffd43b','#69db7c','#38d9a9','#4dabf7','#9775fa','#f783ac'];
+const mk=(n,c)=>({id:uid(),n,c,p:{}});
+const DEF=()=>({
+  members:[{id:'m1',name:'爸爸',e:'👨'},{id:'m2',name:'媽媽',e:'👩'},{id:'m3',name:'小孩',e:'🧒'}],
+  present:{},
+  dishes:[mk('滷肉飯','中式'),mk('牛肉麵','中式'),mk('水餃鍋貼','中式'),mk('拉麵','日式'),mk('壽司','日式'),mk('義大利麵','西式'),mk('披薩','西式'),mk('麥當勞','速食'),mk('火鍋','火鍋燒烤'),mk('燒肉','火鍋燒烤'),mk('外送自選','外送'),mk('在家煮','自煮')],
+  cats:[],mode:'normal',avoid:false,hist:[]
+});
+let S=null;
+try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!S.dishes||!S.members)S=DEF();
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+let elim=[],rot=0,spinning=false,armed=null;
+
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('on'),1800)}
+function ask(k){if(armed===k)return true;armed=k;toast('再按一次確認');setTimeout(()=>{armed=null},3000);return false}
+
+function calc(){
+  const pres=S.members.filter(m=>S.present[m.id]!==false);
+  const recent=S.avoid?S.hist.slice(0,3).map(h=>h.n):[];
+  const out=[],pool=[];
+  S.dishes.forEach(d=>{
+    if(S.cats.length&&!S.cats.includes(d.c))return;
+    const no=pres.filter(m=>d.p[m.id]===-1);
+    if(no.length){out.push(d.n+'（'+no.map(m=>m.name).join('、')+'不要）');return}
+    if(elim.includes(d.id))return;
+    if(recent.includes(d.n)){out.push(d.n+'（最近吃過）');return}
+    pool.push({d,w:1+2*pres.filter(m=>d.p[m.id]===1).length});
+  });
+  return {pool,out};
+}
+
+const cv=$('#wheel'),cx=cv.getContext('2d');
+function draw(){
+  const sz=cv.clientWidth;if(!sz)return;
+  const dpr=window.devicePixelRatio||1;
+  cv.width=cv.height=Math.round(sz*dpr);
+  cx.setTransform(dpr,0,0,dpr,0,0);cx.clearRect(0,0,sz,sz);
+  const c=sz/2,r=c-3,{pool}=calc(),n=pool.length;
+  if(!n){
+    cx.beginPath();cx.arc(c,c,r,0,7);cx.fillStyle='#adb5bd';cx.fill();
+    cx.fillStyle='#fff';cx.font='700 17px sans-serif';cx.textAlign='center';cx.fillText('沒有可選的菜色',c,c+60);return;
+  }
+  const tot=pool.reduce((a,b)=>a+b.w,0),mx=n>12?4:6;let a=0;
+  pool.forEach((p,i)=>{
+    const w=p.w/tot*Math.PI*2;
+    cx.beginPath();cx.moveTo(c,c);cx.arc(c,c,r,rot+a,rot+a+w);cx.closePath();
+    cx.fillStyle=(i===n-1&&i%8===0&&n>1)?COLORS[3]:COLORS[i%8];cx.fill();
+    cx.strokeStyle='#fff';cx.lineWidth=2;cx.stroke();
+    if(n>1){
+      cx.save();cx.translate(c,c);cx.rotate(rot+a+w/2);
+      const fs=Math.max(10,Math.min(17,r*w*.45));
+      cx.font='700 '+fs+'px system-ui,"PingFang TC","Noto Sans TC",sans-serif';cx.textAlign='right';cx.fillStyle='#2b2118';
+      const t=p.d.n.length>mx?p.d.n.slice(0,mx)+'…':p.d.n;
+      cx.fillText(t,r-14,fs*.35);cx.restore();
+    }
+    a+=w;
+  });
+  cx.beginPath();cx.arc(c,c,40,0,7);cx.fillStyle='#fff';cx.fill();
+}
+
+function spin(){
+  if(spinning)return;
+  const {pool}=calc();
+  if(!pool.length){toast('沒有可選的菜色，請調整在場家人或類型');return}
+  if(S.mode==='elim'&&pool.length===1){win(pool[0].d,'⚔️ 只剩一道了');return}
+  const tot=pool.reduce((a,b)=>a+b.w,0);
+  let x=Math.random()*tot,idx=0;
+  for(;idx<pool.length-1;idx++){if(x<pool[idx].w)break;x-=pool[idx].w}
+  let before=0;for(let i=0;i<idx;i++)before+=pool[i].w;
+  const a0=before/tot*Math.PI*2,w=pool[idx].w/tot*Math.PI*2;
+  const off=a0+w*(.15+Math.random()*.7),T=Math.PI*2;
+  const target=-Math.PI/2-off;
+  const delta=(((target-rot)%T)+T)%T+T*(5+Math.floor(Math.random()*3));
+  const start=rot,dur=4200,t0=performance.now();
+  spinning=true;$('#go').disabled=$('#spin').disabled=true;
+  (function f(t){
+    const k=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-k,3);
+    rot=start+delta*e;draw();
+    if(k<1)requestAnimationFrame(f);
+    else{rot=rot%T;spinning=false;$('#go').disabled=$('#spin').disabled=false;done(pool[idx].d)}
+  })(t0);
+}
+
+function modal(h){$('#mc').innerHTML=h;$('#md').hidden=false}
+function win(d,t){
+  modal(`<p class="mu">${t}</p><div class="big">🎉</div><h1>${esc(d.n)}</h1><span class="tag">${esc(d.c)}</span><button class="btn" data-a="eat" data-v="${d.id}">就吃這個！</button><button class="btn ghost" data-a="close">再轉一次</button>`);
+}
+function done(d){
+  try{navigator.vibrate&&navigator.vibrate([60,40,120])}catch(e){}
+  if(S.mode==='elim'){
+    elim.push(d.id);const left=calc().pool;render();
+    if(left.length<=1){win(left[0]?left[0].d:d,'⚔️ 最後留下的是');return}
+    modal(`<div class="big">❌</div><h2>${esc(d.n)}</h2><p class="mu">被淘汰了！還剩 ${left.length} 道</p><button class="btn" data-a="close">繼續淘汰</button>`);
+    return;
+  }
+  win(d,'今晚就吃');
+}
+
+function renderPlay(){
+  const {pool,out}=calc();
+  $('#modes').innerHTML=[['normal','🎡 一般轉盤'],['elim','⚔️ 淘汰賽']].map(([k,t])=>`<button class="seg ${S.mode===k?'on':''}" data-a="mode" data-v="${k}">${t}</button>`).join('');
+  $('#who').innerHTML=S.members.map(m=>`<span class="chip ${S.present[m.id]!==false?'on':''}" data-a="pres" data-v="${m.id}">${m.e} ${esc(m.name)}</span>`).join('');
+  $('#cats').innerHTML=CATS.map(c=>`<span class="chip ${S.cats.includes(c)?'on':''}" data-a="cat" data-v="${c}">${c}</span>`).join('');
+  $('#info').innerHTML=`轉盤裡有 <b>${pool.length}</b> 道`+(S.mode==='elim'?(elim.length?`，已淘汰 ${elim.length} 道，轉到只剩一道為止`:'，每轉到一道就淘汰它'):'')+(out.length?`<br>🚫 今天不考慮：${out.map(esc).join('、')}`:'');
+  $('#spin').textContent=S.mode==='elim'?'⚔️ 轉一個來淘汰':'🎡 開始轉！';
+}
+function renderMenu(){
+  $('#dishes').innerHTML=S.dishes.map(d=>`<div class="dish"><div class="dh"><b>${esc(d.n)}</b><span class="tag">${esc(d.c)}</span><button class="x" data-a="deld" data-v="${d.id}">🗑</button></div><div>${S.members.map(m=>{const v=d.p[m.id]||0;return `<span class="chip pf${v}" data-a="pref" data-v="${d.id}|${m.id}">${v===1?'❤️':v===-1?'🚫':'○'} ${m.e}${esc(m.name)}</span>`}).join('')}</div></div>`).join('')||'<p class="mu">還沒有菜色，先新增一道吧</p>';
+}
+function renderSet(){
+  $('#mems').innerHTML=S.members.map(m=>`<div class="row">${m.e} ${esc(m.name)}<button class="x" data-a="delm" data-v="${m.id}">🗑</button></div>`).join('');
+  $('#opts').innerHTML=`<label class="ck"><input type="checkbox" id="avoid" ${S.avoid?'checked':''}> 避開最近吃過的 3 次</label>`;
+  $('#hist').innerHTML=S.hist.length?S.hist.slice(0,10).map(h=>`${new Date(h.t).toLocaleDateString('zh-TW',{month:'numeric',day:'numeric'})}　${esc(h.n)}`).join('<br>'):'還沒有紀錄，按「就吃這個」就會記下來';
+}
+function render(){renderPlay();renderMenu();renderSet();draw();save()}
+
+function act(a,v){
+  switch(a){
+    case 'tab':
+      document.querySelectorAll('.pg').forEach(p=>p.classList.toggle('on',p.id==='p-'+v));
+      document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+      window.scrollTo(0,0);draw();break;
+    case 'mode':S.mode=v;elim=[];render();break;
+    case 'pres':S.present[v]=S.present[v]===false;elim=[];render();break;
+    case 'cat':S.cats=S.cats.includes(v)?S.cats.filter(c=>c!==v):S.cats.concat(v);elim=[];render();break;
+    case 'pref':{const [di,mi]=v.split('|'),d=S.dishes.find(x=>x.id===di);if(!d)break;
+      const cur=d.p[mi]||0,nx=cur===0?1:cur===1?-1:0;if(nx)d.p[mi]=nx;else delete d.p[mi];render();break}
+    case 'deld':S.dishes=S.dishes.filter(d=>d.id!==v);elim=[];render();break;
+    case 'delm':if(S.members.length<2){toast('至少要留一位家人');break}
+      S.members=S.members.filter(m=>m.id!==v);S.dishes.forEach(d=>delete d.p[v]);render();break;
+    case 'addd':{const n=$('#dn').value.trim();if(!n){toast('請先輸入名稱');break}
+      S.dishes.push(mk(n,$('#catsel').value));$('#dn').value='';elim=[];render();break}
+    case 'addm':{const n=$('#mn').value.trim();if(!n){toast('請先輸入名字');break}
+      S.members.push({id:uid(),name:n,e:$('#me').value});$('#mn').value='';render();break}
+    case 'spin':spin();break;
+    case 'close':$('#md').hidden=true;break;
+    case 'eat':{const d=S.dishes.find(x=>x.id===v);if(d){S.hist.unshift({n:d.n,t:Date.now()});S.hist=S.hist.slice(0,30)}
+      elim=[];$('#md').hidden=true;render();break}
+    case 'clrh':if(ask('clrh')){S.hist=[];render()}break;
+    case 'reset':if(ask('reset')){S=DEF();elim=[];render()}break;
+  }
+}
+document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(t)act(t.dataset.a,t.dataset.v)});
+document.addEventListener('change',e=>{if(e.target.id==='avoid'){S.avoid=e.target.checked;elim=[];render()}});
+document.addEventListener('keydown',e=>{if(e.key!=='Enter')return;
+  if(e.target.id==='dn')act('addd');else if(e.target.id==='mn')act('addm')});
+window.addEventListener('resize',draw);
+$('#catsel').innerHTML=CATS.map(c=>`<option>${c}</option>`).join('');
+render();
+</script>
+</body>
+</html>
