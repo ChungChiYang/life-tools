@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>雙人對決</title>
 <style>
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
@@ -15,6 +15,8 @@ html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;-webkit-user-select:none;user-select:none}
 #app{height:100%}
 body{touch-action:manipulation}
+[data-fast]{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.stop:active,.zone:active{filter:brightness(.9)}
 .bar{width:min(80%,320px);height:14px;border-radius:9px;background:var(--ln);overflow:hidden}
 .bar i{display:block;height:100%;background:var(--pc)}
 .opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;max-width:380px}
@@ -276,7 +278,7 @@ const GAMES={
     body(p){
       const i=p-1,j=1-i,f=t=>t.toFixed(2),df=t=>(t-G.tg>=0?'+':'')+(t-G.tg).toFixed(2);
       if(G.ph==='ready')return `<div class="tg">目標 <b>${G.tg}</b> 秒</div><p class="mu">開始後秒數會被蓋住，心裡默數，到了就按停</p><button class="btn" data-a="bstart" style="background:var(--pc)">▶ 開始（任一人按）</button>`;
-      if(G.ph==='run')return `<div class="tg">目標 <b>${G.tg}</b> 秒</div>`+(G.t[i]==null?`<button class="stop" data-a="bstop" data-p="${p}">🛑 停！</button>`:'<p>✅ 已停，等對方…</p>');
+      if(G.ph==='run')return `<div class="tg">目標 <b>${G.tg}</b> 秒</div>`+(G.t[i]==null?`<button class="stop" data-fast data-a="bstop" data-p="${p}">🛑 停！</button>`:'<p>✅ 已停，等對方…</p>');
       return `<div class="tg">目標 ${G.tg} 秒</div>`;
     },
     mid(){return midT(`目標 ${G.tg} 秒`)},
@@ -285,8 +287,8 @@ const GAMES={
   },
   react:{start:reactStart,
     body(p){
-      if(G.ph==='wait')return `<div class="zone wait" data-a="rtap" data-p="${p}">⏳ 等綠燈…<br>別搶先！</div>`;
-      if(G.ph==='go')return `<div class="zone go" data-a="rtap" data-p="${p}">按！！</div>`;
+      if(G.ph==='wait')return `<div class="zone wait" data-fast data-a="rtap" data-p="${p}">⏳ 等綠燈…<br>別搶先！</div>`;
+      if(G.ph==='go')return `<div class="zone go" data-fast data-a="rtap" data-p="${p}">按！！</div>`;
       const me=G.w===p;
       return `<h2>${me?'這局你贏 ✅':'這局你輸 ❌'}</h2><p>${G.foul?(me?'對方搶先按了！':'你搶先按了…'):Math.round(G.ms)+' 毫秒'}</p>`+(G.final?'':'<button class="btn" data-a="rnext2">下一局</button>');
     },
@@ -294,8 +296,9 @@ const GAMES={
     detail(p){return `${G.s[p-1]} : ${G.s[2-p]}`}
   }
 };
+function tugBars(){document.querySelectorAll('.half').forEach(h=>{const p=h.classList.contains('p1')?1:2,i=h.querySelector('.bar i');if(i)i.style.width=Math.round((p===1?10-G.pos:10+G.pos)/20*100)+'%'})}
 GAMES.tug={start(){G={pos:0,final:null}},
-  body(p){const pc=Math.round((p===1?10-G.pos:10+G.pos)/20*100);return `<div class="bar"><i style="width:${pc}%"></i></div><button class="stop" data-a="tug" data-p="${p}">👊 狂點！</button>`},
+  body(p){const pc=Math.round((p===1?10-G.pos:10+G.pos)/20*100);return `<div class="bar"><i style="width:${pc}%"></i></div><button class="stop" data-fast data-a="tug" data-p="${p}">👊 狂點！</button>`},
   mid(){return midT('先把繩子拉到自己那邊')},
   detail(){return '拔河結束'}};
 const QS='晚餐想吃？,中式,日式,西式,火鍋|假日想去哪？,山上,海邊,市區,在家|比較想要？,早睡,熬夜,早起,賴床|旅行偏好？,自由行,跟團,露營,住飯店|最愛的飲料？,手搖,咖啡,汽水,白開水|吃飯偏好？,多吃肉,多吃菜,吃麵,吃飯|看電影想看？,動作,愛情,喜劇,恐怖|約會想做？,看電影,逛街,運動,宅在家|天氣偏好？,晴天,雨天,陰天,涼爽|甜點選哪個？,蛋糕,冰淇淋,布丁,不吃甜'.split('|').map(q=>q.split(','));
@@ -341,7 +344,7 @@ function act(a,v,p){
     case 'bstop':bstop(p);render();break;
     case 'rtap':rtap(p);render();break;
     case 'rnext2':G.n++;reactWait();render();break;
-    case 'tug':if(!G.final){G.pos+=p===1?-1:1;if(Math.abs(G.pos)>=10)finish(G.pos<0?1:2);render()}break;
+    case 'tug':if(!G.final){G.pos+=p===1?-1:1;try{navigator.vibrate&&navigator.vibrate(8)}catch(e){}if(Math.abs(G.pos)>=10){finish(G.pos<0?1:2);render()}else tugBars()}break;
     case 'qa':if(G.ph==='pick'&&G.a[p-1]==null){G.a[p-1]=+v;if(G.a[0]!=null&&G.a[1]!=null){G.ph='show';if(G.a[0]===G.a[1])G.sc++;if(G.i>=9){G.ttl='默契 '+G.sc+' / 10';finish(0)}}render()}break;
     case 'qnext':G.i++;G.a=[null,null];G.ph='pick';render();break;
     case 'abmode':{const b=AB();b.mode=v;b.turn=0;save();render();break}
@@ -372,7 +375,9 @@ function act(a,v,p){
     case 'bgclose':B().seen=true;save();render();break;
   }
 }
-document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(t)act(t.dataset.a,t.dataset.v,t.dataset.p)});
+document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(t&&t.dataset.fast===undefined)act(t.dataset.a,t.dataset.v,t.dataset.p)});
+document.addEventListener('pointerdown',e=>{if(e.button>0)return;const t=e.target.closest('[data-fast]');if(!t)return;e.preventDefault();act(t.dataset.a,t.dataset.v,t.dataset.p)});
+document.addEventListener('gesturestart',e=>e.preventDefault());
 document.addEventListener('input',e=>{
   if(e.target.id==='n1'){S.n[0]=e.target.value;save()}
   else if(e.target.id==='n2'){S.n[1]=e.target.value;save()}
